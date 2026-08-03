@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Estoque Farmacêutico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ======================================================================
+     IDENTIDADE VISUAL
+     Paleta pensada em ficha de controle de farmácia/dispensário: fundo
+     "papel de receituário" frio, tinta verde-petróleo, âmbar de frasco de
+     medicamento como cor de ação, verde-sálvia para Entrada e terracota
+     para Saída (nunca vermelho puro de "erro", para não parecer alarme).
+     ====================================================================== */
+  :root{
+    --cor-fundo: #EEF3F0;
+    --cor-fundo-cartao: #FBFDFB;
+    --cor-tinta: #17332E;
+    --cor-tinta-suave: #4B6660;
+    --cor-acento: #E2992F;
+    --cor-acento-escuro: #B87A20;
+    --cor-entrada: #3F8F6B;
+    --cor-saida: #C1502E;
+    --cor-borda: #D7E2DC;
+    --sombra: 0 2px 10px rgba(23,51,46,0.07);
+    --fonte-display: 'Space Grotesk', sans-serif;
+    --fonte-corpo: 'IBM Plex Sans', -apple-system, sans-serif;
+    --fonte-mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --raio: 10px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--cor-fundo);
+    color: var(--cor-tinta);
+    font-family: var(--fonte-corpo);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3{ font-family: var(--fonte-display); margin: 0 0 4px; letter-spacing: -0.01em; }
+  h1{ font-size: 22px; } h2{ font-size: 18px; } h3{ font-size: 15px; }
+  code, .mono{ font-family: var(--fonte-mono); }
+  a{ color: var(--cor-acento-escuro); }
+  button{ font-family: var(--fonte-corpo); cursor: pointer; }
+  input, select{ font-family: var(--fonte-corpo); }
+
+  /* --- Faixa de modo demonstração --- */
+  #faixa-demo{
+    display:none;
+    background: repeating-linear-gradient(135deg, var(--cor-acento) 0 14px, #F3B85A 14px 28px);
+    color:#3A2600; font-weight:600; text-align:center; padding:7px 10px;
+    font-size: 13px; letter-spacing:.02em;
+  }
+
+  /* --- Tela de login --- */
+  #tela-login{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .cartao-login{
+    background: var(--cor-fundo-cartao); border:1px solid var(--cor-borda); border-radius: var(--raio);
+    box-shadow: var(--sombra); padding:36px 32px; width:100%; max-width:380px;
+  }
+  .logo-app{ display:flex; align-items:center; gap:10px; margin-bottom:22px; }
+  .logo-blister{ display:flex; gap:3px; }
+  .logo-blister span{ width:8px; height:8px; border-radius:50%; background: var(--cor-acento); display:block; }
+  .logo-blister span:nth-child(2){ background: var(--cor-entrada); }
+  .logo-blister span:nth-child(3){ background: var(--cor-saida); }
+  .campo{ margin-bottom:16px; }
+  .campo label{ display:block; font-size:12.5px; font-weight:600; color: var(--cor-tinta-suave); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em; }
+  .campo input, .campo select, .campo textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--cor-borda); border-radius:8px;
+    background:#fff; color: var(--cor-tinta); font-size:14.5px;
+  }
+  .campo input:focus, .campo select:focus, .campo textarea:focus{ outline:2px solid var(--cor-acento); outline-offset:1px; }
+  .botao{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background: var(--cor-tinta); color:#fff; border:none; border-radius:8px;
+    padding:10px 16px; font-weight:600; font-size:14px; transition: transform .08s ease, opacity .15s;
+  }
+  .botao:hover{ opacity:.92; } .botao:active{ transform: scale(.98); }
+  .botao-primario{ background: var(--cor-acento); color:#3A2600; }
+  .botao-fantasma{ background:transparent; color: var(--cor-tinta); border:1px solid var(--cor-borda); }
+  .botao-perigo{ background:#fff; color: var(--cor-saida); border:1px solid #E7C3B4; }
+  .botao:disabled{ opacity:.5; cursor:not-allowed; }
+  .botao-bloco{ width:100%; }
+  .erro-form{ color: var(--cor-saida); font-size:13px; margin-top:10px; min-height:16px; }
+  .ajuda-demo{ margin-top:18px; font-size:12.5px; color: var(--cor-tinta-suave); border-top:1px dashed var(--cor-borda); padding-top:14px; }
+
+  /* --- Layout principal --- */
+  #app{ display:none; min-height:100vh; }
+  #barra-lateral{
+    width:220px; background: var(--cor-tinta); color:#EAF2EF; flex-shrink:0;
+    padding:20px 14px; display:flex; flex-direction:column;
+  }
+  #barra-lateral .logo-app{ color:#fff; padding:0 6px; }
+  .nav-item{
+    display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:8px;
+    color:#C9DAD4; font-size:14px; font-weight:500; margin-bottom:2px; text-decoration:none;
+    border:none; background:transparent; width:100%; text-align:left;
+  }
+  .nav-item:hover{ background: rgba(255,255,255,.06); color:#fff; }
+  .nav-item.ativo{ background: var(--cor-acento); color:#3A2600; font-weight:600; }
+  .nav-separador{ height:1px; background: rgba(255,255,255,.12); margin:12px 4px; }
+  .nav-rodape{ margin-top:auto; padding-top:14px; }
+  .quem-esta-logado{ font-size:12.5px; color:#9CB6AF; padding:0 10px 8px; }
+
+  #conteudo-principal{ flex:1; min-width:0; padding: 22px 26px 60px; }
+  .cabecalho-tela{ display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
+  .cabecalho-tela p{ color: var(--cor-tinta-suave); margin:2px 0 0; font-size:13.5px; }
+
+  /* "ficha de controle" — cartão com borda picotada no topo, remete a formulário de farmácia */
+  .ficha{
+    background: var(--cor-fundo-cartao); border:1px solid var(--cor-borda); border-radius: var(--raio);
+    box-shadow: var(--sombra); padding:20px; margin-bottom:18px; position:relative; overflow:hidden;
+  }
+  .ficha::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:4px;
+    background-image: radial-gradient(circle, var(--cor-fundo) 2.2px, transparent 2.3px);
+    background-size: 14px 4px; background-position: 4px 0;
+  }
+
+  .grade-kpis{ display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:14px; margin-bottom:18px; }
+  .kpi{ background: var(--cor-fundo-cartao); border:1px solid var(--cor-borda); border-radius: var(--raio); padding:16px 18px; box-shadow: var(--sombra); }
+  .kpi .rotulo{ font-size:12px; text-transform:uppercase; letter-spacing:.04em; color: var(--cor-tinta-suave); font-weight:600; }
+  .kpi .valor{ font-family: var(--fonte-display); font-size:28px; margin-top:6px; }
+  .kpi.entrada .valor{ color: var(--cor-entrada); }
+  .kpi.saida .valor{ color: var(--cor-saida); }
+
+  table{ width:100%; border-collapse: collapse; font-size:13.8px; }
+  th{ text-align:left; padding:9px 10px; color: var(--cor-tinta-suave); font-size:12px; text-transform:uppercase; letter-spacing:.03em; border-bottom:2px solid var(--cor-borda); white-space:nowrap; }
+  td{ padding:9px 10px; border-bottom:1px solid var(--cor-borda); vertical-align:top; }
+  tbody tr:hover{ background: rgba(23,51,46,0.035); }
+  .tabela-scroll{ overflow-x:auto; }
+  .rotulo-es{ display:inline-flex; align-items:center; gap:5px; font-weight:600; padding:2px 9px; border-radius:20px; font-size:12.5px; }
+  .rotulo-es.entrada{ background:#E4F3EC; color: var(--cor-entrada); }
+  .rotulo-es.saida{ background:#FBE8E1; color: var(--cor-saida); }
+  .acoes-linha{ display:flex; gap:6px; white-space:nowrap; }
+  .acoes-linha button{ background:none; border:1px solid var(--cor-borda); border-radius:6px; padding:4px 8px; font-size:12.5px; color: var(--cor-tinta-suave); }
+  .acoes-linha button:hover{ border-color: var(--cor-acento); color: var(--cor-tinta); }
+
+  .barra-ferramentas{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .barra-ferramentas .flex-1{ flex:1; }
+  .badge-atualizacao{ font-size:12.5px; color: var(--cor-tinta-suave); display:flex; align-items:center; gap:6px; }
+  .ponto-status{ width:7px; height:7px; border-radius:50%; background: var(--cor-entrada); display:inline-block; }
+  .ponto-status.carregando{ background: var(--cor-acento); animation: pulsar 1s infinite; }
+  .ponto-status.erro{ background: var(--cor-saida); }
+  @keyframes pulsar{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .aviso-discreto{ background:#FBE8E1; color:#7A2E17; border:1px solid #E7C3B4; border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:12px; display:none; }
+
+  .grafico-mensal{ display:flex; align-items:flex-end; gap:14px; height:180px; padding:10px 4px 0; overflow-x:auto; }
+  .grafico-coluna{ display:flex; flex-direction:column; align-items:center; min-width:46px; }
+  .grafico-barras{ display:flex; align-items:flex-end; gap:3px; height:140px; }
+  .grafico-barra{ width:11px; border-radius: 3px 3px 0 0; }
+  .grafico-barra.entrada{ background: var(--cor-entrada); }
+  .grafico-barra.saida{ background: var(--cor-saida); }
+  .grafico-legenda-mes{ font-size:11px; color: var(--cor-tinta-suave); margin-top:6px; font-family: var(--fonte-mono); }
+
+  .legenda-inline{ display:flex; gap:16px; font-size:12.5px; color: var(--cor-tinta-suave); margin-top:8px; }
+  .legenda-inline span{ display:inline-flex; align-items:center; gap:5px; }
+  .ponto-legenda{ width:9px; height:9px; border-radius:2px; display:inline-block; }
+
+  .duas-colunas{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
+  @media (max-width: 980px){ .duas-colunas{ grid-template-columns: 1fr; } }
+
+  /* --- Modal genérico de formulário --- */
+  .sobreposicao{ position:fixed; inset:0; background: rgba(23,51,46,.38); display:none; align-items:center; justify-content:center; padding:20px; z-index:50; }
+  .modal{ background: var(--cor-fundo-cartao); border-radius: var(--raio); padding:24px; width:100%; max-width:460px; max-height:90vh; overflow-y:auto; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+  .modal-rodape{ display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+
+  .chip-lista{ display:inline-flex; align-items:center; gap:8px; background:#F1F6F3; border:1px solid var(--cor-borda); border-radius:20px; padding:5px 6px 5px 12px; margin:0 6px 8px 0; font-size:13px; }
+  .chip-lista button{ background:none; border:none; color: var(--cor-tinta-suave); font-size:15px; line-height:1; padding:2px 6px; border-radius:50%; }
+  .chip-lista button:hover{ background:#E3ECE7; color: var(--cor-saida); }
+
+  .toggle{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13.5px; user-select:none; }
+  .toggle input{ width:34px; height:19px; -webkit-appearance:none; appearance:none; background:#D7E2DC; border-radius:20px; position:relative; outline:none; cursor:pointer; }
+  .toggle input::before{ content:""; position:absolute; width:15px; height:15px; border-radius:50%; background:#fff; top:2px; left:2px; transition:.15s; }
+  .toggle input:checked{ background: var(--cor-entrada); }
+  .toggle input:checked::before{ left:17px; }
+
+  .vazio{ text-align:center; color: var(--cor-tinta-suave); padding:30px 10px; font-size:13.5px; }
+  .rodape-nota{ color: var(--cor-tinta-suave); font-size:12px; margin-top:26px; }
+
+  #layout-app{ display:flex; min-height:100vh; }
+  #botao-menu-mobile{ display:none; }
+  @media (max-width: 800px){
+    #layout-app{ flex-direction:column; }
+    #barra-lateral{ width:100%; flex-direction:row; align-items:center; overflow-x:auto; padding:10px 12px; gap:6px; }
+    #barra-lateral .logo-app{ display:none; }
+    .nav-rodape{ margin-top:0; }
+    .quem-esta-logado{ display:none; }
+    #conteudo-principal{ padding:16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="faixa-demo">MODO DEMONSTRAÇÃO — os dados abaixo são fictícios e vivem só nesta aba. Configure CONFIG.API_URL para conectar à sua planilha.</div>
+
+<!-- ===================== TELA DE LOGIN ===================== -->
+<div id="tela-login">
+  <div class="cartao-login">
+    <div class="logo-app">
+      <div class="logo-blister"><span></span><span></span><span></span></div>
+      <h1>Estoque Farmacêutico</h1>
+    </div>
+    <form id="form-login" onsubmit="return false;">
+      <div class="campo">
+        <label for="campo-usuario">Usuário</label>
+        <input id="campo-usuario" type="text" autocomplete="username" required>
+      </div>
+      <div class="campo">
+        <label for="campo-senha">Senha</label>
+        <input id="campo-senha" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="botao botao-primario botao-bloco" id="botao-entrar" type="submit">Entrar</button>
+      <div class="erro-form" id="erro-login"></div>
+    </form>
+    <div class="ajuda-demo" id="ajuda-demo" style="display:none;">
+      Modo demonstração ativo. Use <strong>admin / admin</strong> (Administrador) ou <strong>operador / operador</strong> (Operador) para entrar.
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APLICAÇÃO ===================== -->
+<div id="app">
+  <div id="layout-app">
+    <nav id="barra-lateral">
+      <div class="logo-app">
+        <div class="logo-blister"><span></span><span></span><span></span></div>
+        <h1 style="font-size:16px;">Estoque</h1>
+      </div>
+      <div id="itens-navegacao"></div>
+      <div class="nav-rodape">
+        <div class="nav-separador"></div>
+        <div class="quem-esta-logado" id="quem-esta-logado"></div>
+        <button class="nav-item" id="botao-sair">↩ Sair</button>
+      </div>
+    </nav>
+    <main id="conteudo-principal"></main>
+  </div>
+</div>
+
+<!-- ===================== MODAL GENÉRICO (formulário) ===================== -->
+<div class="sobreposicao" id="sobreposicao-modal">
+  <div class="modal">
+    <h2 id="titulo-modal">Novo registro</h2>
+    <form id="form-modal" onsubmit="return false;"></form>
+    <div class="erro-form" id="erro-modal"></div>
+    <div class="modal-rodape">
+      <button class="botao botao-fantasma" id="botao-cancelar-modal" type="button">Cancelar</button>
+      <button class="botao botao-primario" id="botao-salvar-modal" type="button">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   CONFIGURAÇÃO
+   Cole aqui a URL do seu Web App do Apps Script (veja GUIA_DE_CONFIGURACAO.md).
+   Deixe vazio ("") para o sistema funcionar em MODO DEMONSTRAÇÃO, com dados
+   de exemplo guardados só na memória desta aba (nada é salvo de verdade).
+   ============================================================================ */
+const CONFIG = {
+  API_URL: '' // <<< cole aqui a URL do Web App publicado
+};
+
+/* ============================================================================
+   ESTADO DA APLICAÇÃO (tudo em memória — nunca localStorage/sessionStorage)
+   ============================================================================ */
+const estado = {
+  token: null, usuario: null, papel: null, nome: null,
+  estrutura: null,      // resposta de getEstrutura: { abas, listas, papel }
+  telaAtual: null,      // nome da tela ativa
+  cacheListagens: {},   // aba -> registros (para não perder tela ao recarregar)
+  dashboard: { dados: null, ultimaAtualizacao: null, autoAtualizar: false, intervaloMinutos: 5, timer: null },
+  edicaoModal: null      // { aba, id, colunas } quando o modal está editando algo
+};
+
+const $ = (sel, ctx) => (ctx || document).querySelector(sel);
+const $all = (sel, ctx) => Array.from((ctx || document).querySelectorAll(sel));
+function escaparHtml(texto){
+  return String(texto === undefined || texto === null ? '' : texto)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function normalizarTexto(t){
+  return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+}
+function formatarData(valor){
+  if(!valor) return '';
+  const d = new Date(valor);
+  if(isNaN(d.getTime())) return String(valor);
+  return d.toLocaleDateString('pt-BR');
+}
+function paraInputData(valor){
+  if(!valor) return '';
+  const d = new Date(valor);
+  if(isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0,10);
+}
+function nomeDoMes(chaveAnoMes){
+  const [ano, mes] = chaveAnoMes.split('-').map(Number);
+  const nomes = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  return nomes[mes-1] + '/' + String(ano).slice(2);
+}
+
+/* ============================================================================
+   MODO DEMONSTRAÇÃO — um "backend" falso, em JavaScript, que imita as mesmas
+   ações do Code.gs (login, getEstrutura, listar, criar, atualizar, excluir,
+   dashboard, relatorio, listasAdicionar/Atualizar/Remover). Serve só para
+   você testar o painel sem precisar publicar a planilha ainda.
+   ============================================================================ */
+const bancoDemo = (function(){
+  const usuarios = [
+    { ID:'u1', Usuario:'admin', Senha:'admin', Papel:'Administrador', Nome:'Ana (Administradora)' },
+    { ID:'u2', Usuario:'operador', Senha:'operador', Papel:'Operador', Nome:'Bruno (Operador)' }
+  ];
+  const listas = {
+    'Turno': ['Manhã','Tarde','Noite'],
+    'E/S': ['Entrada','Saída'],
+    'Material': ['Dipirona 500mg','Amoxicilina 500mg','Soro Fisiológico 0,9% 500ml','Paracetamol 750mg','Insulina NPH 100UI/ml','Luva de Procedimento M'],
+    'Destino': ['Farmácia Central','Enfermaria A','Enfermaria B','Centro Cirúrgico','UTI','Ambulatório']
+  };
+  function dataISO(diasAtras){ const d = new Date(); d.setDate(d.getDate()-diasAtras); return d.toISOString(); }
+  const movimentacao = [
+    { ID:'m1', Data:dataISO(58), Turno:'Manhã', Colaborador:'Bruno (Operador)', 'E/S':'Entrada', Material:'Dipirona 500mg', Lote:'DPN2301', Validade:dataISO(-320), Destino:'Farmácia Central', 'Nome do Paciente':'', 'Nota Fiscal':'NF-1001', Qtde:500 },
+    { ID:'m2', Data:dataISO(50), Turno:'Tarde', Colaborador:'Bruno (Operador)', 'E/S':'Saída', Material:'Dipirona 500mg', Lote:'DPN2301', Validade:dataISO(-320), Destino:'Enfermaria A', 'Nome do Paciente':'Maria Silva', 'Nota Fiscal':'', Qtde:40 },
+    { ID:'m3', Data:dataISO(45), Turno:'Manhã', Colaborador:'Ana (Administradora)', 'E/S':'Entrada', Material:'Amoxicilina 500mg', Lote:'AMX0987', Validade:dataISO(-200), Destino:'Farmácia Central', 'Nome do Paciente':'', 'Nota Fiscal':'NF-1002', Qtde:300 },
+    { ID:'m4', Data:dataISO(38), Turno:'Noite', Colaborador:'Bruno (Operador)', 'E/S':'Saída', Material:'Amoxicilina 500mg', Lote:'AMX0987', Validade:dataISO(-200), Destino:'Enfermaria B', 'Nome do Paciente':'João Souza', 'Nota Fiscal':'', Qtde:60 },
+    { ID:'m5', Data:dataISO(30), Turno:'Manhã', Colaborador:'Ana (Administradora)', 'E/S':'Entrada', Material:'Soro Fisiológico 0,9% 500ml', Lote:'SF4412', Validade:dataISO(-500), Destino:'Farmácia Central', 'Nome do Paciente':'', 'Nota Fiscal':'NF-1003', Qtde:200 },
+    { ID:'m6', Data:dataISO(22), Turno:'Tarde', Colaborador:'Bruno (Operador)', 'E/S':'Saída', Material:'Soro Fisiológico 0,9% 500ml', Lote:'SF4412', Validade:dataISO(-500), Destino:'Centro Cirúrgico', 'Nome do Paciente':'', 'Nota Fiscal':'', Qtde:75 },
+    { ID:'m7', Data:dataISO(16), Turno:'Noite', Colaborador:'Bruno (Operador)', 'E/S':'Saída', Material:'Insulina NPH 100UI/ml', Lote:'INS0021', Validade:dataISO(-90), Destino:'UTI', 'Nome do Paciente':'Carla Nunes', 'Nota Fiscal':'', Qtde:12 },
+    { ID:'m8', Data:dataISO(10), Turno:'Manhã', Colaborador:'Ana (Administradora)', 'E/S':'Entrada', Material:'Paracetamol 750mg', Lote:'PCT7788', Validade:dataISO(-400), Destino:'Farmácia Central', 'Nome do Paciente':'', 'Nota Fiscal':'NF-1004', Qtde:400 },
+    { ID:'m9', Data:dataISO(4), Turno:'Tarde', Colaborador:'Bruno (Operador)', 'E/S':'Saída', Material:'Paracetamol 750mg', Lote:'PCT7788', Validade:dataISO(-400), Destino:'Ambulatório', 'Nome do Paciente':'Pedro Alves', 'Nota Fiscal':'', Qtde:55 },
+    { ID:'m10', Data:dataISO(1), Turno:'Manhã', Colaborador:'Bruno (Operador)', 'E/S':'Entrada', Material:'Luva de Procedimento M', Lote:'LVM3390', Validade:dataISO(-600), Destino:'Farmácia Central', 'Nome do Paciente':'', 'Nota Fiscal':'NF-1005', Qtde:1000 }
+  ];
+  return { usuarios, listas, movimentacao };
+})();
+
+function inferirColunas(nomesCabecalho, nomeAba){
+  const listasNorm = {};
+  Object.keys(bancoDemo.listas).forEach(n => listasNorm[normalizarTexto(n)] = { nome:n, opcoes: bancoDemo.listas[n] });
+  return nomesCabecalho.filter(c => normalizarTexto(c) !== 'id').map(nomeColuna => {
+    const norm = normalizarTexto(nomeColuna);
+    let tipo = 'texto', opcoes = null;
+    if(listasNorm[norm]){ tipo = 'select'; opcoes = listasNorm[norm].opcoes; }
+    else if(norm.indexOf('data') !== -1 || norm.indexOf('validade') !== -1){ tipo = 'data'; }
+    else if(norm.indexOf('qtde') !== -1 || norm.indexOf('quantidade') !== -1 || norm.indexOf('qtd') !== -1){ tipo = 'numero'; }
+    else if(nomeAba === 'Usuarios' && norm === 'senha'){ tipo = 'senha'; }
+    return { nome: nomeColuna, tipo, opcoes };
+  });
+}
+
+function mapearSentidoColunas(cabecalhos){
+  const achar = (candidatos) => cabecalhos.find(c => {
+    const n = normalizarTexto(c);
+    return candidatos.some(cand => n.indexOf(cand) !== -1 || cand.indexOf(n) !== -1);
+  }) || null;
+  return {
+    data: achar(['data']), qtde: achar(['qtde','quantidade','qtd']),
+    entradaSaida: achar(['es','entradasaida']), destino: achar(['destino','local','setor']),
+    material: achar(['material','produto','medicamento','item'])
+  };
+}
+const ehEntradaDemo = v => normalizarTexto(v).indexOf('entrada') !== -1;
+const ehSaidaDemo = v => normalizarTexto(v).indexOf('saida') !== -1;
+function chaveMesDemo(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+
+function apiDemo(action, data){
+  return new Promise(resolve => setTimeout(() => {
+    try{ resolve(processarAcaoDemo(action, data || {})); }
+    catch(erro){ resolve({ ok:false, erro: 'Erro no modo demonstração: ' + erro.message }); }
+  }, 260 + Math.random()*260));
+}
+
+function processarAcaoDemo(action, data){
+  if(action === 'login'){
+    const u = bancoDemo.usuarios.find(u => u.Usuario === data.usuario && u.Senha === data.senha);
+    if(!u) return { ok:false, erro:'Usuário ou senha inválidos.' };
+    const token = 'demo-' + u.ID;
+    return { ok:true, token, usuario:u.Usuario, papel:u.Papel, nome:u.Nome };
+  }
+
+  const sessao = bancoDemo.usuarios.find(u => 'demo-' + u.ID === data.token);
+  if(!sessao) return { ok:false, erro:'Sessão inválida ou expirada. Faça login novamente.' };
+  const papel = sessao.Papel;
+  const podeTudo = papel === 'Administrador';
+
+  if(action === 'getEstrutura'){
+    const abas = [
+      { nome:'Movimentacao', colunas: inferirColunas(Object.keys(bancoDemo.movimentacao[0]), 'Movimentacao') },
+    ];
+    if(podeTudo) abas.push({ nome:'Usuarios', colunas: inferirColunas(Object.keys(bancoDemo.usuarios[0]), 'Usuarios') });
+    return { ok:true, abas, listas: bancoDemo.listas, papel };
+  }
+
+  if(action === 'listar'){
+    if(data.aba === 'Movimentacao'){
+      return { ok:true, registros: bancoDemo.movimentacao.map(r => ({...r})) };
+    }
+    if(data.aba === 'Usuarios' && podeTudo){
+      return { ok:true, registros: bancoDemo.usuarios.map(u => ({...u, Senha:'••••••'})) };
+    }
+    return { ok:false, erro:'Seu perfil não tem permissão para essa ação.' };
+  }
+
+  if(action === 'criar'){
+    if(data.aba === 'Movimentacao'){
+      const novo = Object.assign({ ID: 'm' + Date.now() }, data.dados);
+      bancoDemo.movimentacao.push(novo);
+      return { ok:true, registro: novo };
+    }
+    if(data.aba === 'Usuarios' && podeTudo){
+      const novo = Object.assign({ ID: 'u' + Date.now() }, data.dados);
+      bancoDemo.usuarios.push(novo);
+      return { ok:true, registro: novo };
+    }
+    return { ok:false, erro:'Seu perfil não tem permissão para essa ação.' };
+  }
+
+  if(action === 'atualizar'){
+    if(!podeTudo) return { ok:false, erro:'Seu perfil (Operador) não pode editar registros.' };
+    const lista = data.aba === 'Movimentacao' ? bancoDemo.movimentacao : (data.aba === 'Usuarios' ? bancoDemo.usuarios : null);
+    if(!lista) return { ok:false, erro:'Aba não encontrada.' };
+    const registro = lista.find(r => r.ID === data.id);
+    if(!registro) return { ok:false, erro:'Registro não encontrado.' };
+    Object.assign(registro, data.dados);
+    return { ok:true, registro };
+  }
+
+  if(action === 'excluir'){
+    if(!podeTudo) return { ok:false, erro:'Seu perfil (Operador) não pode excluir registros.' };
+    const lista = data.aba === 'Movimentacao' ? bancoDemo.movimentacao : (data.aba === 'Usuarios' ? bancoDemo.usuarios : null);
+    if(!lista) return { ok:false, erro:'Aba não encontrada.' };
+    const indice = lista.findIndex(r => r.ID === data.id);
+    if(indice === -1) return { ok:false, erro:'Registro não encontrado.' };
+    lista.splice(indice,1);
+    return { ok:true, idExcluido: data.id };
+  }
+
+  if(action === 'listasAdicionar'){
+    if(!podeTudo) return { ok:false, erro:'Sem permissão.' };
+    if(!bancoDemo.listas[data.lista]) bancoDemo.listas[data.lista] = [];
+    bancoDemo.listas[data.lista].push(data.valor);
+    return { ok:true };
+  }
+  if(action === 'listasRemover'){
+    if(!podeTudo) return { ok:false, erro:'Sem permissão.' };
+    const lst = bancoDemo.listas[data.lista];
+    if(!lst) return { ok:false, erro:'Lista não encontrada.' };
+    const i = lst.indexOf(data.valor);
+    if(i !== -1) lst.splice(i,1);
+    return { ok:true };
+  }
+
+  if(action === 'dashboard' || action === 'relatorio'){
+    const cabecalhos = Object.keys(bancoDemo.movimentacao[0]);
+    const col = mapearSentidoColunas(cabecalhos);
+    if(action === 'dashboard'){
+      const hoje = new Date();
+      const ano = data.ano ? Number(data.ano) : hoje.getFullYear();
+      const mes = data.mes ? Number(data.mes) : hoje.getMonth()+1;
+      let totalEntradasMes=0, totalSaidasMes=0;
+      const porDestinoMap={}, porMaterialMesMap={}, saldoMaterialMap={}, serieMap={};
+      bancoDemo.movimentacao.forEach(l => {
+        const d = new Date(l[col.data]); if(isNaN(d.getTime())) return;
+        const qtde = Number(l[col.qtde])||0; const tipo=l[col.entradaSaida];
+        const entrada = ehEntradaDemo(tipo), saida = ehSaidaDemo(tipo);
+        const sinal = entrada?1:(saida?-1:0);
+        const material = l[col.material];
+        if(material) saldoMaterialMap[material] = (saldoMaterialMap[material]||0) + sinal*qtde;
+        const chave = chaveMesDemo(d);
+        if(!serieMap[chave]) serieMap[chave] = {mes:chave, entradas:0, saidas:0};
+        if(entrada) serieMap[chave].entradas += qtde; if(saida) serieMap[chave].saidas += qtde;
+        if(d.getFullYear()!==ano || (d.getMonth()+1)!==mes) return;
+        if(entrada) totalEntradasMes += qtde; if(saida) totalSaidasMes += qtde;
+        const destino = l[col.destino];
+        if(destino){ if(!porDestinoMap[destino]) porDestinoMap[destino]={destino,entradas:0,saidas:0}; if(entrada) porDestinoMap[destino].entradas+=qtde; if(saida) porDestinoMap[destino].saidas+=qtde; }
+        if(material){ if(!porMaterialMesMap[material]) porMaterialMesMap[material]={material,entradas:0,saidas:0}; if(entrada) porMaterialMesMap[material].entradas+=qtde; if(saida) porMaterialMesMap[material].saidas+=qtde; }
+      });
+      const serieMensal = Object.values(serieMap).sort((a,b)=>a.mes<b.mes?-1:1).slice(-12);
+      const porMaterial = Object.values(porMaterialMesMap).map(m=>({...m, saldoAtual: saldoMaterialMap[m.material]||0}))
+        .sort((a,b)=>(b.entradas+b.saidas)-(a.entradas+a.saidas));
+      return { ok:true, periodo:{mes,ano}, totalEntradasMes, totalSaidasMes, saldoMes: totalEntradasMes-totalSaidasMes,
+        serieMensal, porDestino: Object.values(porDestinoMap), porMaterial };
+    } else {
+      const dataInicio = data.dataInicio ? new Date(data.dataInicio+'T00:00:00') : null;
+      const dataFim = data.dataFim ? new Date(data.dataFim+'T23:59:59') : null;
+      let resumo={entradas:0,saidas:0}; const porDestinoMap={}, porMaterialMap={}; const movimentos=[];
+      bancoDemo.movimentacao.forEach(l => {
+        const d = new Date(l[col.data]); if(isNaN(d.getTime())) return;
+        if(dataInicio && d<dataInicio) return; if(dataFim && d>dataFim) return;
+        const destino=l[col.destino], material=l[col.material];
+        if(data.destino && destino!==data.destino) return;
+        if(data.material && material!==data.material) return;
+        const qtde=Number(l[col.qtde])||0; const tipo=l[col.entradaSaida];
+        const entrada=ehEntradaDemo(tipo), saida=ehSaidaDemo(tipo);
+        if(entrada) resumo.entradas+=qtde; if(saida) resumo.saidas+=qtde;
+        if(destino){ if(!porDestinoMap[destino]) porDestinoMap[destino]={destino,entradas:0,saidas:0}; if(entrada) porDestinoMap[destino].entradas+=qtde; if(saida) porDestinoMap[destino].saidas+=qtde; }
+        if(material){ if(!porMaterialMap[material]) porMaterialMap[material]={material,entradas:0,saidas:0}; if(entrada) porMaterialMap[material].entradas+=qtde; if(saida) porMaterialMap[material].saidas+=qtde; }
+        movimentos.push({...l});
+      });
+      return { ok:true, resumo:{...resumo, saldo:resumo.entradas-resumo.saidas},
+        porDestino: Object.values(porDestinoMap).map(d=>({...d, saldo:d.entradas-d.saidas})),
+        porMaterial: Object.values(porMaterialMap).map(m=>({...m, saldo:m.entradas-m.saidas})),
+        movimentos };
+    }
+  }
+
+  return { ok:false, erro:'Ação desconhecida: ' + action };
+}
+
+/* ============================================================================
+   CAMADA DE API — decide se fala com o Apps Script real ou com o modo demo
+   ============================================================================ */
+async function api(action, data){
+  data = Object.assign({ token: estado.token }, data || {});
+  if(!CONFIG.API_URL){ return apiDemo(action, data); }
+  try{
+    const resposta = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // propositalmente text/plain: evita preflight de CORS no Apps Script
+      body: JSON.stringify({ action, data })
+    });
+    return await resposta.json();
+  } catch(erro){
+    return { ok:false, erro:'Falha de conexão com a planilha: ' + erro.message };
+  }
+}
+
+/* ============================================================================
+   AUTENTICAÇÃO
+   ============================================================================ */
+if(!CONFIG.API_URL){ $('#faixa-demo').style.display='block'; $('#ajuda-demo').style.display='block'; }
+
+$('#form-login').addEventListener('submit', async () => {
+  const usuario = $('#campo-usuario').value.trim();
+  const senha = $('#campo-senha').value;
+  const botao = $('#botao-entrar');
+  const erroEl = $('#erro-login');
+  erroEl.textContent = ''; botao.disabled = true; botao.textContent = 'Entrando…';
+  const resp = await api('login', { usuario, senha });
+  botao.disabled = false; botao.textContent = 'Entrar';
+  if(!resp.ok){ erroEl.textContent = resp.erro || 'Não foi possível entrar.'; return; }
+  estado.token = resp.token; estado.usuario = resp.usuario; estado.papel = resp.papel; estado.nome = resp.nome;
+  await iniciarAplicacao();
+});
+
+$('#botao-sair').addEventListener('click', () => {
+  if(estado.dashboard.timer) clearInterval(estado.dashboard.timer);
+  Object.assign(estado, { token:null, usuario:null, papel:null, nome:null, estrutura:null, cacheListagens:{} });
+  $('#app').style.display='none'; $('#tela-login').style.display='flex';
+  $('#campo-usuario').value=''; $('#campo-senha').value='';
+});
+
+async function iniciarAplicacao(){
+  const estrutura = await api('getEstrutura', {});
+  if(!estrutura.ok){ $('#erro-login').textContent = estrutura.erro; return; }
+  estado.estrutura = estrutura;
+  $('#tela-login').style.display='none'; $('#app').style.display='block';
+  $('#quem-esta-logado').innerHTML = `Logado como<br><strong>${escaparHtml(estado.nome)}</strong> · ${escaparHtml(estado.papel)}`;
+  montarNavegacao();
+  abrirTela('dashboard');
+}
+
+/* ============================================================================
+   NAVEGAÇÃO — montada a partir do que getEstrutura devolveu (abas existentes)
+   ============================================================================ */
+function montarNavegacao(){
+  const nav = $('#itens-navegacao');
+  const itens = [
+    { id:'dashboard', rotulo:'📊 Dashboard' },
+    { id:'relatorio', rotulo:'📅 Relatório periódico' }
+  ];
+  estado.estrutura.abas.forEach(aba => {
+    itens.push({ id:'aba:'+aba.nome, rotulo: (normalizarTexto(aba.nome)==='usuarios' ? '👤 ' : '📋 ') + aba.nome });
+  });
+  if(estado.papel === 'Administrador'){
+    itens.push({ id:'listas', rotulo:'🏷️ Listas de opções' });
+  }
+  nav.innerHTML = itens.map(it => `<button class="nav-item" data-tela="${it.id}">${it.rotulo}</button>`).join('');
+  $all('.nav-item', nav).forEach(btn => btn.addEventListener('click', () => abrirTela(btn.dataset.tela)));
+}
+
+function marcarNavAtiva(id){
+  $all('.nav-item[data-tela]').forEach(b => b.classList.toggle('ativo', b.dataset.tela === id));
+}
+
+function abrirTela(id){
+  if(estado.dashboard.timer && id !== 'dashboard'){ clearInterval(estado.dashboard.timer); estado.dashboard.timer=null; }
+  estado.telaAtual = id;
+  marcarNavAtiva(id);
+  const raiz = $('#conteudo-principal');
+  if(id === 'dashboard') return renderizarDashboard(raiz);
+  if(id === 'relatorio') return renderizarRelatorio(raiz);
+  if(id === 'listas') return renderizarListas(raiz);
+  if(id.startsWith('aba:')) return renderizarAbaGenerica(raiz, id.slice(4));
+}
+
+/* ============================================================================
+   TELA GENÉRICA DE DADOS (tabela + formulário) — usada para Movimentacao,
+   Usuarios e qualquer outra aba de registros que a planilha vier a ter.
+   Nada aqui tem nome de coluna fixo: tudo vem de estado.estrutura.
+   ============================================================================ */
+async function renderizarAbaGenerica(raiz, nomeAba){
+  const infoAba = estado.estrutura.abas.find(a => a.nome === nomeAba);
+  if(!infoAba){ raiz.innerHTML = '<div class="ficha vazio">Aba não encontrada.</div>'; return; }
+
+  raiz.innerHTML = `
+    <div class="cabecalho-tela">
+      <div><h1>${escaparHtml(nomeAba)}</h1><p>Registros lidos diretamente da aba "${escaparHtml(nomeAba)}" da planilha.</p></div>
+      <button class="botao botao-primario" id="botao-novo-registro">+ Novo registro</button>
+    </div>
+    <div class="ficha">
+      <div class="barra-ferramentas">
+        <input type="text" id="busca-generica" placeholder="Buscar…" style="max-width:260px; padding:8px 12px; border:1px solid var(--cor-borda); border-radius:8px;">
+        <span class="flex-1"></span>
+        <span id="contador-registros" style="font-size:13px; color:var(--cor-tinta-suave);"></span>
+      </div>
+      <div class="tabela-scroll"><div id="tabela-generica">Carregando…</div></div>
+    </div>`;
+
+  $('#botao-novo-registro').addEventListener('click', () => abrirModalFormulario(nomeAba, infoAba.colunas, null));
+  $('#busca-generica').addEventListener('input', (e) => desenharTabelaGenerica(nomeAba, infoAba.colunas, e.target.value));
+
+  const resp = await api('listar', { aba: nomeAba });
+  if(!resp.ok){ $('#tabela-generica').innerHTML = `<div class="vazio">${escaparHtml(resp.erro)}</div>`; return; }
+  estado.cacheListagens[nomeAba] = resp.registros;
+  desenharTabelaGenerica(nomeAba, infoAba.colunas, '');
+}
+
+function desenharTabelaGenerica(nomeAba, colunas, filtro){
+  const alvo = $('#tabela-generica');
+  let registros = estado.cacheListagens[nomeAba] || [];
+  if(filtro){
+    const f = normalizarTexto(filtro);
+    registros = registros.filter(r => colunas.some(c => normalizarTexto(r[c.nome]).indexOf(f) !== -1));
+  }
+  $('#contador-registros') && ($('#contador-registros').textContent = registros.length + (registros.length===1?' registro':' registros'));
+
+  if(registros.length === 0){ alvo.innerHTML = '<div class="vazio">Nenhum registro encontrado.</div>'; return; }
+
+  const podeEditar = estado.papel === 'Administrador';
+  const colunaEouS = colunas.find(c => normalizarTexto(c.nome) === 'es');
+
+  alvo.innerHTML = `<table><thead><tr>
+      ${colunas.map(c => `<th>${escaparHtml(c.nome)}</th>`).join('')}
+      ${podeEditar ? '<th></th>' : ''}
+    </tr></thead><tbody>
+      ${registros.map(reg => `<tr>
+        ${colunas.map(c => `<td>${formatarCelula(reg[c.nome], c)}</td>`).join('')}
+        ${podeEditar ? `<td class="acoes-linha">
+            <button data-acao="editar" data-id="${escaparHtml(reg.ID)}">Editar</button>
+            <button data-acao="excluir" data-id="${escaparHtml(reg.ID)}">Excluir</button>
+          </td>` : ''}
+      </tr>`).join('')}
+    </tbody></table>`;
+
+  if(podeEditar){
+    $all('button[data-acao="editar"]', alvo).forEach(b => b.addEventListener('click', () => {
+      const registro = registros.find(r => String(r.ID) === b.dataset.id);
+      const infoAba = estado.estrutura.abas.find(a => a.nome === nomeAba);
+      abrirModalFormulario(nomeAba, infoAba.colunas, registro);
+    }));
+    $all('button[data-acao="excluir"]', alvo).forEach(b => b.addEventListener('click', async () => {
+      if(!confirm('Excluir este registro? Essa ação não pode ser desfeita.')) return;
+      const resp = await api('excluir', { aba: nomeAba, id: b.dataset.id });
+      if(!resp.ok){ alert(resp.erro); return; }
+      estado.cacheListagens[nomeAba] = estado.cacheListagens[nomeAba].filter(r => String(r.ID) !== b.dataset.id);
+      desenharTabelaGenerica(nomeAba, colunas, $('#busca-generica') ? $('#busca-generica').value : '');
+    }));
+  }
+}
+
+function formatarCelula(valor, coluna){
+  if(coluna.tipo === 'senha') return '••••••';
+  if(coluna.tipo === 'data') return escaparHtml(formatarData(valor));
+  if(normalizarTexto(coluna.nome) === 'es'){
+    const cls = ehEntradaDemo(valor) ? 'entrada' : (ehSaidaDemo(valor) ? 'saida' : '');
+    return `<span class="rotulo-es ${cls}">${escaparHtml(valor)}</span>`;
+  }
+  return escaparHtml(valor);
+}
+
+/* --- Modal genérico de criar/editar registro --- */
+function abrirModalFormulario(nomeAba, colunas, registroExistente){
+  estado.edicaoModal = { aba: nomeAba, colunas, id: registroExistente ? registroExistente.ID : null };
+  $('#titulo-modal').textContent = registroExistente ? 'Editar registro' : 'Novo registro em "' + nomeAba + '"';
+  $('#erro-modal').textContent = '';
+  $('#form-modal').innerHTML = colunas.map(coluna => {
+    const valor = registroExistente ? registroExistente[coluna.nome] : '';
+    const idCampo = 'campo-modal-' + normalizarTexto(coluna.nome);
+    let campoHtml = '';
+    if(coluna.tipo === 'select'){
+      campoHtml = `<select id="${idCampo}"><option value=""></option>${(coluna.opcoes||[]).map(op =>
+        `<option value="${escaparHtml(op)}" ${String(valor)===String(op)?'selected':''}>${escaparHtml(op)}</option>`).join('')}</select>`;
+    } else if(coluna.tipo === 'numero'){
+      campoHtml = `<input id="${idCampo}" type="number" step="any" value="${escaparHtml(valor)}">`;
+    } else if(coluna.tipo === 'data'){
+      campoHtml = `<input id="${idCampo}" type="date" value="${paraInputData(valor)}">`;
+    } else if(coluna.tipo === 'senha'){
+      campoHtml = `<input id="${idCampo}" type="password" placeholder="${registroExistente ? 'deixe em branco para manter' : ''}">`;
+    } else {
+      campoHtml = `<input id="${idCampo}" type="text" value="${escaparHtml(valor)}">`;
+    }
+    return `<div class="campo"><label for="${idCampo}">${escaparHtml(coluna.nome)}</label>${campoHtml}</div>`;
+  }).join('');
+  $('#sobreposicao-modal').style.display = 'flex';
+}
+$('#botao-cancelar-modal').addEventListener('click', () => $('#sobreposicao-modal').style.display='none');
+$('#sobreposicao-modal').addEventListener('click', (e) => { if(e.target.id==='sobreposicao-modal') $('#sobreposicao-modal').style.display='none'; });
+
+$('#botao-salvar-modal').addEventListener('click', async () => {
+  const { aba, colunas, id } = estado.edicaoModal;
+  const dados = {};
+  colunas.forEach(coluna => {
+    const idCampo = 'campo-modal-' + normalizarTexto(coluna.nome);
+    const el = document.getElementById(idCampo);
+    if(!el) return;
+    if(coluna.tipo === 'senha' && !el.value) return; // não sobrescreve senha se deixado em branco
+    if(coluna.tipo === 'data' && el.value){ dados[coluna.nome] = new Date(el.value + 'T00:00:00').toISOString(); return; }
+    dados[coluna.nome] = el.value;
+  });
+
+  const botao = $('#botao-salvar-modal'); botao.disabled = true; botao.textContent = 'Salvando…';
+  const resp = id ? await api('atualizar', { aba, id, dados }) : await api('criar', { aba, dados });
+  botao.disabled = false; botao.textContent = 'Salvar';
+
+  if(!resp.ok){ $('#erro-modal').textContent = resp.erro; return; }
+  $('#sobreposicao-modal').style.display = 'none';
+
+  if(id){
+    const lista = estado.cacheListagens[aba] || [];
+    const idx = lista.findIndex(r => String(r.ID) === String(id));
+    if(idx !== -1) lista[idx] = resp.registro;
+  } else {
+    (estado.cacheListagens[aba] || (estado.cacheListagens[aba]=[])).push(resp.registro);
+  }
+  if(estado.telaAtual === 'aba:'+aba) desenharTabelaGenerica(aba, colunas, '');
+});
+
+/* ============================================================================
+   DASHBOARD — KPIs, gráfico mensal e atualização (manual e automática)
+   ============================================================================ */
+function renderizarDashboard(raiz){
+  raiz.innerHTML = `
+    <div class="cabecalho-tela">
+      <div><h1>Dashboard</h1><p>Visão geral das entradas e saídas de estoque.</p></div>
+    </div>
+    <div class="ficha">
+      <div class="barra-ferramentas">
+        <button class="botao botao-fantasma" id="botao-atualizar-dashboard">↻ Atualizar dados</button>
+        <span class="badge-atualizacao" id="badge-atualizacao-dashboard"><span class="ponto-status"></span> —</span>
+        <span class="flex-1"></span>
+        <label class="toggle"><input type="checkbox" id="toggle-auto-dashboard"> Atualizar automaticamente</label>
+        <select id="intervalo-auto-dashboard" style="padding:6px 8px; border:1px solid var(--cor-borda); border-radius:6px;">
+          <option value="1">a cada 1 min</option>
+          <option value="5" selected>a cada 5 min</option>
+          <option value="10">a cada 10 min</option>
+        </select>
+      </div>
+      <div class="aviso-discreto" id="aviso-dashboard"></div>
+      <div id="corpo-dashboard">Carregando…</div>
+    </div>`;
+
+  $('#botao-atualizar-dashboard').addEventListener('click', () => buscarDashboard(true));
+  $('#toggle-auto-dashboard').addEventListener('change', (e) => {
+    estado.dashboard.autoAtualizar = e.target.checked;
+    if(estado.dashboard.timer){ clearInterval(estado.dashboard.timer); estado.dashboard.timer=null; }
+    if(e.target.checked){
+      const ms = Number($('#intervalo-auto-dashboard').value) * 60000;
+      estado.dashboard.timer = setInterval(() => buscarDashboard(false), ms);
+    }
+  });
+  $('#intervalo-auto-dashboard').addEventListener('change', (e) => {
+    estado.dashboard.intervaloMinutos = Number(e.target.value);
+    if(estado.dashboard.autoAtualizar){
+      clearInterval(estado.dashboard.timer);
+      estado.dashboard.timer = setInterval(() => buscarDashboard(false), Number(e.target.value)*60000);
+    }
+  });
+
+  if(estado.dashboard.dados) desenharCorpoDashboard(estado.dashboard.dados);
+  buscarDashboard(estado.dashboard.dados === null);
+}
+
+async function buscarDashboard(mostrarCarregando){
+  const badge = $('#badge-atualizacao-dashboard');
+  const aviso = $('#aviso-dashboard');
+  if(!badge) return; // usuário já saiu da tela
+  if(mostrarCarregando){
+    badge.innerHTML = '<span class="ponto-status carregando"></span> Atualizando…';
+  }
+  const resp = await api('dashboard', {});
+  if(!$('#badge-atualizacao-dashboard')) return; // saiu da tela enquanto esperava
+
+  if(!resp.ok){
+    aviso.style.display='block'; aviso.textContent = '⚠ Não foi possível atualizar agora (' + resp.erro + '). Mostrando os últimos dados carregados.';
+    badge.innerHTML = '<span class="ponto-status erro"></span> Falha na última atualização';
+    if(!estado.dashboard.dados) $('#corpo-dashboard').innerHTML = '<div class="vazio">Sem dados ainda.</div>';
+    return;
+  }
+  aviso.style.display='none';
+  estado.dashboard.dados = resp;
+  estado.dashboard.ultimaAtualizacao = new Date();
+  badge.innerHTML = '<span class="ponto-status"></span> Última atualização às ' +
+    estado.dashboard.ultimaAtualizacao.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  desenharCorpoDashboard(resp);
+}
+
+function desenharCorpoDashboard(d){
+  const corpo = $('#corpo-dashboard');
+  if(!corpo) return;
+  const max = Math.max(1, ...d.serieMensal.flatMap(m => [m.entradas, m.saidas]));
+
+  corpo.innerHTML = `
+    <div class="grade-kpis">
+      <div class="kpi entrada"><div class="rotulo">Entradas no mês</div><div class="valor">${d.totalEntradasMes.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi saida"><div class="rotulo">Saídas no mês</div><div class="valor">${d.totalSaidasMes.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi"><div class="rotulo">Saldo do mês</div><div class="valor">${d.saldoMes.toLocaleString('pt-BR')}</div></div>
+    </div>
+
+    <h3>Entradas x Saídas por mês</h3>
+    <div class="grafico-mensal">
+      ${d.serieMensal.map(m => `
+        <div class="grafico-coluna">
+          <div class="grafico-barras">
+            <div class="grafico-barra entrada" style="height:${Math.round(m.entradas/max*140)}px" title="Entradas: ${m.entradas}"></div>
+            <div class="grafico-barra saida" style="height:${Math.round(m.saidas/max*140)}px" title="Saídas: ${m.saidas}"></div>
+          </div>
+          <div class="grafico-legenda-mes">${nomeDoMes(m.mes)}</div>
+        </div>`).join('') || '<p class="vazio">Sem movimentações registradas ainda.</p>'}
+    </div>
+    <div class="legenda-inline">
+      <span><i class="ponto-legenda" style="background:var(--cor-entrada)"></i>Entradas</span>
+      <span><i class="ponto-legenda" style="background:var(--cor-saida)"></i>Saídas</span>
+    </div>
+
+    <div class="duas-colunas" style="margin-top:22px;">
+      <div>
+        <h3>Movimentação do mês por destino</h3>
+        <div class="tabela-scroll">${tabelaSimples(['Destino','Entradas','Saídas'], d.porDestino.map(x => [x.destino, x.entradas, x.saidas]))}</div>
+      </div>
+      <div>
+        <h3>Movimentação do mês por material (e saldo atual)</h3>
+        <div class="tabela-scroll">${tabelaSimples(['Material','Entradas no mês','Saídas no mês','Saldo atual'], d.porMaterial.map(x => [x.material, x.entradas, x.saidas, x.saldoAtual]))}</div>
+      </div>
+    </div>`;
+}
+
+function tabelaSimples(cabecalhos, linhas){
+  if(linhas.length === 0) return '<p class="vazio">Sem dados no período.</p>';
+  return `<table><thead><tr>${cabecalhos.map(c=>`<th>${escaparHtml(c)}</th>`).join('')}</tr></thead>
+    <tbody>${linhas.map(l => `<tr>${l.map(v => `<td>${typeof v==='number' ? v.toLocaleString('pt-BR') : escaparHtml(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+/* ============================================================================
+   RELATÓRIO PERIÓDICO — filtra por intervalo de datas, destino e material
+   ============================================================================ */
+function renderizarRelatorio(raiz){
+  const listaDestinos = Object.keys(estado.estrutura.listas).find(n => normalizarTexto(n).indexOf('destino')!==-1);
+  const listaMateriais = Object.keys(estado.estrutura.listas).find(n => normalizarTexto(n).indexOf('material')!==-1 || normalizarTexto(n).indexOf('produto')!==-1);
+  const opcoesDestino = listaDestinos ? estado.estrutura.listas[listaDestinos] : [];
+  const opcoesMaterial = listaMateriais ? estado.estrutura.listas[listaMateriais] : [];
+
+  const hoje = new Date();
+  const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0,10);
+  const hojeISO = hoje.toISOString().slice(0,10);
+
+  raiz.innerHTML = `
+    <div class="cabecalho-tela"><div><h1>Relatório periódico</h1><p>Entradas, saídas e saldo em um intervalo de datas, por local e por material.</p></div></div>
+    <div class="ficha">
+      <div class="barra-ferramentas" style="flex-wrap:wrap;">
+        <div class="campo" style="margin:0;"><label>De</label><input type="date" id="rel-data-inicio" value="${primeiroDiaMes}"></div>
+        <div class="campo" style="margin:0;"><label>Até</label><input type="date" id="rel-data-fim" value="${hojeISO}"></div>
+        <div class="campo" style="margin:0; min-width:180px;"><label>Destino</label>
+          <select id="rel-destino"><option value="">Todos</option>${opcoesDestino.map(o=>`<option value="${escaparHtml(o)}">${escaparHtml(o)}</option>`).join('')}</select></div>
+        <div class="campo" style="margin:0; min-width:180px;"><label>Material</label>
+          <select id="rel-material"><option value="">Todos</option>${opcoesMaterial.map(o=>`<option value="${escaparHtml(o)}">${escaparHtml(o)}</option>`).join('')}</select></div>
+        <button class="botao botao-primario" id="rel-buscar" style="align-self:flex-end;">Gerar relatório</button>
+      </div>
+      <div class="aviso-discreto" id="rel-aviso"></div>
+      <div id="rel-corpo">Escolha um período e clique em "Gerar relatório".</div>
+    </div>`;
+
+  $('#rel-buscar').addEventListener('click', buscarRelatorio);
+  buscarRelatorio();
+}
+
+async function buscarRelatorio(){
+  const botao = $('#rel-buscar'); const aviso = $('#rel-aviso'); const corpo = $('#rel-corpo');
+  botao.disabled = true; botao.textContent = 'Gerando…'; aviso.style.display='none';
+  const resp = await api('relatorio', {
+    dataInicio: $('#rel-data-inicio').value, dataFim: $('#rel-data-fim').value,
+    destino: $('#rel-destino').value, material: $('#rel-material').value
+  });
+  botao.disabled = false; botao.textContent = 'Gerar relatório';
+  if(!resp.ok){ aviso.style.display='block'; aviso.textContent = '⚠ ' + resp.erro; return; }
+
+  corpo.innerHTML = `
+    <div class="grade-kpis">
+      <div class="kpi entrada"><div class="rotulo">Entradas no período</div><div class="valor">${resp.resumo.entradas.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi saida"><div class="rotulo">Saídas no período</div><div class="valor">${resp.resumo.saidas.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi"><div class="rotulo">Saldo do período</div><div class="valor">${resp.resumo.saldo.toLocaleString('pt-BR')}</div></div>
+    </div>
+    <div class="duas-colunas">
+      <div><h3>Por local (Destino)</h3><div class="tabela-scroll">${tabelaSimples(['Destino','Entradas','Saídas','Saldo'], resp.porDestino.map(x=>[x.destino,x.entradas,x.saidas,x.saldo]))}</div></div>
+      <div><h3>Por material</h3><div class="tabela-scroll">${tabelaSimples(['Material','Entradas','Saídas','Saldo'], resp.porMaterial.map(x=>[x.material,x.entradas,x.saidas,x.saldo]))}</div></div>
+    </div>
+    <h3 style="margin-top:22px;">Movimentações do período (${resp.movimentos.length})</h3>
+    <div class="tabela-scroll">${resp.movimentos.length === 0 ? '<p class="vazio">Nenhuma movimentação nesse período/filtro.</p>' :
+      `<table><thead><tr>${Object.keys(resp.movimentos[0]).map(c=>`<th>${escaparHtml(c)}</th>`).join('')}</tr></thead>
+        <tbody>${resp.movimentos.map(m => `<tr>${Object.entries(m).map(([chave,valor]) =>
+          `<td>${normalizarTexto(chave).indexOf('data')!==-1 || normalizarTexto(chave).indexOf('validade')!==-1 ? escaparHtml(formatarData(valor)) : escaparHtml(valor)}</td>`).join('')}</tr>`).join('')}</tbody></table>`}
+    </div>`;
+}
+
+/* ============================================================================
+   ADMINISTRAÇÃO DE LISTAS (dropdowns) — só para o papel Administrador
+   ============================================================================ */
+function renderizarListas(raiz){
+  const listas = estado.estrutura.listas;
+  raiz.innerHTML = `
+    <div class="cabecalho-tela"><div><h1>Listas de opções</h1><p>Essas listas alimentam os menus suspensos dos formulários. Peça para o nome da lista bater com o nome da coluna na aba de dados.</p></div></div>
+    <div class="ficha">
+      ${Object.keys(listas).map(nomeLista => `
+        <div style="margin-bottom:20px;">
+          <h3>${escaparHtml(nomeLista)}</h3>
+          <div id="chips-${normalizarTexto(nomeLista)}">${chipsDeLista(nomeLista, listas[nomeLista])}</div>
+          <div style="display:flex; gap:8px; margin-top:8px; max-width:360px;">
+            <input type="text" id="novo-valor-${normalizarTexto(nomeLista)}" placeholder="Nova opção para ${escaparHtml(nomeLista)}" style="flex:1; padding:8px 10px; border:1px solid var(--cor-borda); border-radius:8px;">
+            <button class="botao botao-fantasma" data-adicionar-lista="${escaparHtml(nomeLista)}">Adicionar</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  $all('button[data-adicionar-lista]').forEach(btn => btn.addEventListener('click', async () => {
+    const nomeLista = btn.dataset.adicionarLista;
+    const input = document.getElementById('novo-valor-' + normalizarTexto(nomeLista));
+    const valor = input.value.trim();
+    if(!valor) return;
+    btn.disabled = true;
+    const resp = await api('listasAdicionar', { lista: nomeLista, valor });
+    btn.disabled = false;
+    if(!resp.ok){ alert(resp.erro); return; }
+    listas[nomeLista] = listas[nomeLista] || []; listas[nomeLista].push(valor);
+    input.value = '';
+    document.getElementById('chips-' + normalizarTexto(nomeLista)).innerHTML = chipsDeLista(nomeLista, listas[nomeLista]);
+    ligarChipsRemover(nomeLista);
+  }));
+  Object.keys(listas).forEach(ligarChipsRemover);
+}
+
+function chipsDeLista(nomeLista, opcoes){
+  if(!opcoes || opcoes.length===0) return '<span class="vazio" style="padding:6px 0;">Nenhuma opção cadastrada ainda.</span>';
+  return opcoes.map(op => `<span class="chip-lista">${escaparHtml(op)}<button data-remover-de="${escaparHtml(nomeLista)}" data-valor="${escaparHtml(op)}" title="Remover">×</button></span>`).join('');
+}
+
+function ligarChipsRemover(nomeLista){
+  $all(`button[data-remover-de="${nomeLista}"]`).forEach(btn => btn.addEventListener('click', async () => {
+    if(!confirm('Remover "' + btn.dataset.valor + '" da lista "' + nomeLista + '"?')) return;
+    const resp = await api('listasRemover', { lista: nomeLista, valor: btn.dataset.valor });
+    if(!resp.ok){ alert(resp.erro); return; }
+    const listas = estado.estrutura.listas;
+    listas[nomeLista] = listas[nomeLista].filter(v => v !== btn.dataset.valor);
+    document.getElementById('chips-' + normalizarTexto(nomeLista)).innerHTML = chipsDeLista(nomeLista, listas[nomeLista]);
+    ligarChipsRemover(nomeLista);
+  }));
+}
+</script>
+</body>
+</html>
