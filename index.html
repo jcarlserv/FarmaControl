@@ -47,7 +47,22 @@
   button{ font-family: var(--fonte-corpo); cursor: pointer; }
   input, select{ font-family: var(--fonte-corpo); }
 
-  /* --- Faixa de modo demonstração --- */
+  /* --- Barra de progresso fininha no topo (indeterminada, estilo "carregando") --- */
+  #barra-progresso{
+    position: fixed; top:0; left:0; right:0; height:3px; z-index:200;
+    background: transparent; overflow:hidden; opacity:0; transition: opacity .2s ease;
+  }
+  #barra-progresso.ativa{ opacity:1; }
+  #barra-progresso::before{
+    content:""; position:absolute; top:0; bottom:0; width:35%; border-radius:0 3px 3px 0;
+    background: var(--cor-acento);
+  }
+  #barra-progresso.ativa::before{ animation: deslizar-progresso 1.1s ease-in-out infinite; }
+  @keyframes deslizar-progresso{
+    0%{ left:-35%; }
+    100%{ left:100%; }
+  }
+
   #faixa-demo{
     display:none;
     background: repeating-linear-gradient(135deg, var(--cor-acento) 0 14px, #F3B85A 14px 28px);
@@ -196,6 +211,7 @@
 </style>
 </head>
 <body>
+<div id="barra-progresso"></div>
 
 <div id="faixa-demo">MODO DEMONSTRAÇÃO — os dados abaixo são fictícios e vivem só nesta aba. Configure CONFIG.API_URL para conectar à sua planilha.</div>
 
@@ -371,7 +387,7 @@ function apiDemo(action, data){
   return new Promise(resolve => setTimeout(() => {
     try{ resolve(processarAcaoDemo(action, data || {})); }
     catch(erro){ resolve({ ok:false, erro: 'Erro no modo demonstração: ' + erro.message }); }
-  }, 260 + Math.random()*260));
+  }, 150 + Math.random()*150)); // atraso pequeno só para simular uma chamada de rede de verdade
 }
 
 function processarAcaoDemo(action, data){
@@ -514,18 +530,37 @@ function processarAcaoDemo(action, data){
 /* ============================================================================
    CAMADA DE API — decide se fala com o Apps Script real ou com o modo demo
    ============================================================================ */
+/* ============================================================================
+   BARRA DE PROGRESSO — fininha, no topo da página. Liga/desliga sozinha em
+   toda chamada à API (contador para não "piscar" quando há chamadas simultâneas).
+   ============================================================================ */
+let requisicoesEmAndamento = 0;
+function iniciarBarraProgresso(){
+  requisicoesEmAndamento++;
+  $('#barra-progresso').classList.add('ativa');
+}
+function pararBarraProgresso(){
+  requisicoesEmAndamento = Math.max(0, requisicoesEmAndamento - 1);
+  if(requisicoesEmAndamento === 0) $('#barra-progresso').classList.remove('ativa');
+}
+
 async function api(action, data){
   data = Object.assign({ token: estado.token }, data || {});
-  if(!CONFIG.API_URL){ return apiDemo(action, data); }
+  iniciarBarraProgresso();
   try{
-    const resposta = await fetch(CONFIG.API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // propositalmente text/plain: evita preflight de CORS no Apps Script
-      body: JSON.stringify({ action, data })
-    });
-    return await resposta.json();
-  } catch(erro){
-    return { ok:false, erro:'Falha de conexão com a planilha: ' + erro.message };
+    if(!CONFIG.API_URL){ return await apiDemo(action, data); }
+    try{
+      const resposta = await fetch(CONFIG.API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // propositalmente text/plain: evita preflight de CORS no Apps Script
+        body: JSON.stringify({ action, data })
+      });
+      return await resposta.json();
+    } catch(erro){
+      return { ok:false, erro:'Falha de conexão com a planilha: ' + erro.message };
+    }
+  } finally {
+    pararBarraProgresso();
   }
 }
 
