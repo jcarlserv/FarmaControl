@@ -236,7 +236,6 @@
       <div class="nav-rodape">
         <div class="nav-separador"></div>
         <div class="quem-esta-logado" id="quem-esta-logado"></div>
-        <button class="nav-item" id="botao-sair">↩ Sair</button>
       </div>
     </nav>
     <main id="conteudo-principal"></main>
@@ -548,12 +547,13 @@ $('#form-login').addEventListener('submit', async () => {
   await iniciarAplicacao();
 });
 
-$('#botao-sair').addEventListener('click', () => {
+function sairDoSistema(){
   if(estado.dashboard.timer) clearInterval(estado.dashboard.timer);
-  Object.assign(estado, { token:null, usuario:null, papel:null, nome:null, estrutura:null, cacheListagens:{} });
+  if(estado.abaAtual && estado.abaAtual.timer) clearInterval(estado.abaAtual.timer);
+  Object.assign(estado, { token:null, usuario:null, papel:null, nome:null, estrutura:null, cacheListagens:{}, abaAtual:null });
   $('#app').style.display='none'; $('#tela-login').style.display='flex';
   $('#campo-usuario').value=''; $('#campo-senha').value='';
-});
+}
 
 async function iniciarAplicacao(){
   const estrutura = await api('getEstrutura', {});
@@ -570,18 +570,31 @@ async function iniciarAplicacao(){
    ============================================================================ */
 function montarNavegacao(){
   const nav = $('#itens-navegacao');
-  const itens = [
-    { id:'dashboard', rotulo:'📊 Dashboard' },
-    { id:'relatorio', rotulo:'📅 Relatório periódico' }
-  ];
-  estado.estrutura.abas.forEach(aba => {
-    itens.push({ id:'aba:'+aba.nome, rotulo: (normalizarTexto(aba.nome)==='usuarios' ? '👤 ' : '📋 ') + aba.nome });
-  });
+  // Ordem fixa pedida: Movimentação, Relatório periódico, Lista de opções, Usuários, Dashboard.
+  // Qualquer aba nova que não seja "Movimentacao"/"Usuarios" entra depois de Usuários, antes do Dashboard,
+  // para o menu continuar se adaptando caso a planilha ganhe outra aba de dados.
+  const abaMovimentacao = estado.estrutura.abas.find(a => normalizarTexto(a.nome) === 'movimentacao');
+  const abaUsuarios = estado.estrutura.abas.find(a => normalizarTexto(a.nome) === 'usuarios');
+  const outrasAbas = estado.estrutura.abas.filter(a => a !== abaMovimentacao && a !== abaUsuarios);
+
+  const itens = [];
+  if(abaMovimentacao) itens.push({ id:'aba:'+abaMovimentacao.nome, rotulo:'📋 ' + abaMovimentacao.nome });
+  itens.push({ id:'relatorio', rotulo:'📅 Relatório periódico' });
   if(estado.papel === 'Administrador'){
-    itens.push({ id:'listas', rotulo:'🏷️ Listas de opções' });
+    itens.push({ id:'listas', rotulo:'🏷️ Lista de opções' });
   }
-  nav.innerHTML = itens.map(it => `<button class="nav-item" data-tela="${it.id}">${it.rotulo}</button>`).join('');
-  $all('.nav-item', nav).forEach(btn => btn.addEventListener('click', () => abrirTela(btn.dataset.tela)));
+  if(abaUsuarios && estado.papel === 'Administrador'){
+    itens.push({ id:'aba:'+abaUsuarios.nome, rotulo:'👤 ' + abaUsuarios.nome });
+  }
+  if(estado.papel === 'Administrador'){
+    outrasAbas.forEach(aba => itens.push({ id:'aba:'+aba.nome, rotulo:'📋 ' + aba.nome }));
+  }
+  itens.push({ id:'dashboard', rotulo:'📊 Dashboard' });
+
+  nav.innerHTML = itens.map(it => `<button class="nav-item" data-tela="${it.id}">${it.rotulo}</button>`).join('') +
+    `<button class="nav-item" id="botao-sair">🚪 Sair</button>`;
+  $all('.nav-item[data-tela]', nav).forEach(btn => btn.addEventListener('click', () => abrirTela(btn.dataset.tela)));
+  $('#botao-sair').addEventListener('click', sairDoSistema);
 }
 
 function marcarNavAtiva(id){
@@ -590,6 +603,7 @@ function marcarNavAtiva(id){
 
 function abrirTela(id){
   if(estado.dashboard.timer && id !== 'dashboard'){ clearInterval(estado.dashboard.timer); estado.dashboard.timer=null; }
+  if(estado.abaAtual && estado.abaAtual.timer && id !== 'aba:'+estado.abaAtual.nome){ clearInterval(estado.abaAtual.timer); estado.abaAtual=null; }
   estado.telaAtual = id;
   marcarNavAtiva(id);
   const raiz = $('#conteudo-principal');
@@ -608,27 +622,76 @@ async function renderizarAbaGenerica(raiz, nomeAba){
   const infoAba = estado.estrutura.abas.find(a => a.nome === nomeAba);
   if(!infoAba){ raiz.innerHTML = '<div class="ficha vazio">Aba não encontrada.</div>'; return; }
 
+  // Estado de auto-atualização é por aba — troca de tela zera isso (ver abrirTela).
+  estado.abaAtual = { nome: nomeAba, timer: null, autoAtualizar: false, intervaloMinutos: 5 };
+
   raiz.innerHTML = `
     <div class="cabecalho-tela">
-      <div><h1>${escaparHtml(nomeAba)}</h1><p>Registros lidos diretamente da aba "${escaparHtml(nomeAba)}" da planilha.</p></div>
+      <div><h1>${escaparHtml(nomeAba)}</h1><p>Registros lidos diretamente da aba "${escaparHtml(nomeAba)}" da planilha. Não é preciso recarregar a página nem logar de novo — use "Atualizar" para ver lançamentos de outras pessoas.</p></div>
       <button class="botao botao-primario" id="botao-novo-registro">+ Novo registro</button>
     </div>
     <div class="ficha">
       <div class="barra-ferramentas">
-        <input type="text" id="busca-generica" placeholder="Buscar…" style="max-width:260px; padding:8px 12px; border:1px solid var(--cor-borda); border-radius:8px;">
+        <button class="botao botao-fantasma" id="botao-atualizar-aba">↻ Atualizar</button>
+        <span class="badge-atualizacao" id="badge-atualizacao-aba"><span class="ponto-status"></span> —</span>
+        <input type="text" id="busca-generica" placeholder="Buscar…" style="max-width:220px; padding:8px 12px; border:1px solid var(--cor-borda); border-radius:8px;">
         <span class="flex-1"></span>
+        <label class="toggle"><input type="checkbox" id="toggle-auto-aba"> Atualizar automaticamente</label>
+        <select id="intervalo-auto-aba" style="padding:6px 8px; border:1px solid var(--cor-borda); border-radius:6px;">
+          <option value="1">a cada 1 min</option>
+          <option value="5" selected>a cada 5 min</option>
+          <option value="10">a cada 10 min</option>
+        </select>
         <span id="contador-registros" style="font-size:13px; color:var(--cor-tinta-suave);"></span>
       </div>
+      <div class="aviso-discreto" id="aviso-aba"></div>
       <div class="tabela-scroll"><div id="tabela-generica">Carregando…</div></div>
     </div>`;
 
   $('#botao-novo-registro').addEventListener('click', () => abrirModalFormulario(nomeAba, infoAba.colunas, null));
   $('#busca-generica').addEventListener('input', (e) => desenharTabelaGenerica(nomeAba, infoAba.colunas, e.target.value));
+  $('#botao-atualizar-aba').addEventListener('click', () => buscarAbaGenerica(nomeAba, infoAba.colunas, true));
+  $('#toggle-auto-aba').addEventListener('change', (e) => {
+    if(!estado.abaAtual || estado.abaAtual.nome !== nomeAba) return;
+    estado.abaAtual.autoAtualizar = e.target.checked;
+    if(estado.abaAtual.timer){ clearInterval(estado.abaAtual.timer); estado.abaAtual.timer = null; }
+    if(e.target.checked){
+      const ms = Number($('#intervalo-auto-aba').value) * 60000;
+      estado.abaAtual.timer = setInterval(() => buscarAbaGenerica(nomeAba, infoAba.colunas, false), ms);
+    }
+  });
+  $('#intervalo-auto-aba').addEventListener('change', (e) => {
+    if(!estado.abaAtual || estado.abaAtual.nome !== nomeAba) return;
+    estado.abaAtual.intervaloMinutos = Number(e.target.value);
+    if(estado.abaAtual.autoAtualizar){
+      clearInterval(estado.abaAtual.timer);
+      estado.abaAtual.timer = setInterval(() => buscarAbaGenerica(nomeAba, infoAba.colunas, false), Number(e.target.value)*60000);
+    }
+  });
 
+  buscarAbaGenerica(nomeAba, infoAba.colunas, true);
+}
+
+async function buscarAbaGenerica(nomeAba, colunas, mostrarCarregando){
+  const badge = $('#badge-atualizacao-aba');
+  const aviso = $('#aviso-aba');
+  if(!badge || !estado.abaAtual || estado.abaAtual.nome !== nomeAba) return; // usuário já saiu da tela
+
+  if(mostrarCarregando) badge.innerHTML = '<span class="ponto-status carregando"></span> Atualizando…';
   const resp = await api('listar', { aba: nomeAba });
-  if(!resp.ok){ $('#tabela-generica').innerHTML = `<div class="vazio">${escaparHtml(resp.erro)}</div>`; return; }
+  if(!$('#badge-atualizacao-aba') || !estado.abaAtual || estado.abaAtual.nome !== nomeAba) return; // saiu da tela enquanto esperava
+
+  if(!resp.ok){
+    aviso.style.display='block'; aviso.textContent = '⚠ Não foi possível atualizar agora (' + resp.erro + '). Mostrando os últimos dados carregados.';
+    badge.innerHTML = '<span class="ponto-status erro"></span> Falha na última atualização';
+    if(!estado.cacheListagens[nomeAba]) $('#tabela-generica').innerHTML = '<div class="vazio">Sem dados ainda.</div>';
+    return;
+  }
+  aviso.style.display='none';
   estado.cacheListagens[nomeAba] = resp.registros;
-  desenharTabelaGenerica(nomeAba, infoAba.colunas, '');
+  badge.innerHTML = '<span class="ponto-status"></span> Última atualização às ' +
+    new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  desenharTabelaGenerica(nomeAba, colunas, $('#busca-generica') ? $('#busca-generica').value : '');
 }
 
 function desenharTabelaGenerica(nomeAba, colunas, filtro){
@@ -690,7 +753,14 @@ function abrirModalFormulario(nomeAba, colunas, registroExistente){
   $('#titulo-modal').textContent = registroExistente ? 'Editar registro' : 'Novo registro em "' + nomeAba + '"';
   $('#erro-modal').textContent = '';
   $('#form-modal').innerHTML = colunas.map(coluna => {
-    const valor = registroExistente ? registroExistente[coluna.nome] : '';
+    // Ao criar um registro novo, a coluna "Data" (a data do lançamento) já vem preenchida com
+    // hoje, mas continua editável — o usuário pode trocar para outra data se precisar.
+    // "Validade" e outras colunas de data não recebem esse padrão automático.
+    const ehColunaDataDoLancamento = coluna.tipo === 'data' && normalizarTexto(coluna.nome) === 'data';
+    let valor;
+    if(registroExistente){ valor = registroExistente[coluna.nome]; }
+    else if(ehColunaDataDoLancamento){ valor = new Date().toISOString(); }
+    else { valor = ''; }
     const idCampo = 'campo-modal-' + normalizarTexto(coluna.nome);
     let campoHtml = '';
     if(coluna.tipo === 'select'){
