@@ -3,13 +3,13 @@
    ============================================================================ */
 const demo = (function(){
   function h(diasAtras){ const d=new Date(); d.setDate(d.getDate()-diasAtras); return d.toISOString().slice(0,10); }
-  const municipios = [ { id:'mun1', nome:'Sobral', uf:'CE', logo_url:null }, { id:'mun2', nome:'Fortaleza', uf:'CE', logo_url:null } ];
+  const municipios = [ { id:'mun1', nome:'Sobral', uf:'CE', logo_url:null, cor_acento:null }, { id:'mun2', nome:'Fortaleza', uf:'CE', logo_url:null, cor_acento:null } ];
   const unidades = [
     { id:'un1', municipio_id:'mun1', nome:'Hospital Municipal de Sobral', tipo:'Hospital', logo_url:null },
     { id:'un2', municipio_id:'mun1', nome:'UBS Centro', tipo:'UBS', logo_url:null },
     { id:'un3', municipio_id:'mun2', nome:'UPA Fortaleza Leste', tipo:'UPA', logo_url:null }
   ];
-  const organizacao = { nome:'Minha Organização (demo)', logo_url:null };
+  const organizacao = { nome:'Minha Organização (demo)', logo_url:null, cor_acento:null };
   const listas = { 'Turno':['Manhã','Tarde','Noite'], 'E/S':['Entrada','Saída'],
     'Material':['Dipirona 500mg','Amoxicilina 500mg','Soro Fisiológico 0,9% 500ml','Paracetamol 750mg'],
     'Destino':['Farmácia Central','Enfermaria A','Enfermaria B','Centro Cirúrgico','UTI'] };

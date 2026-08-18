@@ -98,20 +98,23 @@
   /* --- Layout principal --- */
   #app{ display:none; min-height:100vh; }
   #barra-lateral{
-    width:220px; background: var(--cor-tinta); color:#EAF2EF; flex-shrink:0;
-    padding:20px 14px; display:flex; flex-direction:column;
+    width:100%; background: var(--cor-tinta); color:#EAF2EF; flex-shrink:0;
+    padding:10px 20px; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
   }
-  #barra-lateral .logo-app{ color:#fff; padding:0 6px; }
+  #barra-lateral .logo-app{ color:#fff; margin:0; }
+  #itens-navegacao{ display:flex; align-items:center; flex-wrap:wrap; gap:3px; flex:1; min-width:200px; }
   .nav-item{
-    display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:8px;
-    color:#C9DAD4; font-size:14px; font-weight:500; margin-bottom:2px; text-decoration:none;
-    border:none; background:transparent; width:100%; text-align:left;
+    display:flex; align-items:center; gap:7px; padding:8px 12px; border-radius:8px;
+    color:#C9DAD4; font-size:13.5px; font-weight:500; text-decoration:none; white-space:nowrap;
+    border:none; background:transparent; text-align:left;
   }
   .nav-item:hover{ background: rgba(255,255,255,.06); color:#fff; }
   .nav-item.ativo{ background: var(--cor-acento); color:#3A2600; font-weight:600; }
-  .nav-separador{ height:1px; background: rgba(255,255,255,.12); margin:12px 4px; }
-  .nav-rodape{ margin-top:auto; padding-top:14px; }
-  .quem-esta-logado{ font-size:12.5px; color:#9CB6AF; padding:0 10px 8px; }
+  .nav-separador{ display:none; }
+  .nav-rodape{ margin:0; display:flex; align-items:center; gap:12px; flex-shrink:0; }
+  .quem-esta-logado{ font-size:12px; color:#9CB6AF; line-height:1.35; text-align:right; }
+  .quem-esta-logado br{ display:none; }
+  .quem-esta-logado br:first-of-type{ display:block; }
 
   #conteudo-principal{ flex:1; min-width:0; padding: 22px 26px 60px; }
   .cabecalho-tela{ display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
@@ -189,13 +192,12 @@
   .vazio{ text-align:center; color: var(--cor-tinta-suave); padding:30px 10px; font-size:13.5px; }
   .rodape-nota{ color: var(--cor-tinta-suave); font-size:12px; margin-top:26px; }
 
-  #layout-app{ display:flex; min-height:100vh; }
+  #layout-app{ display:flex; flex-direction:column; min-height:100vh; }
   #botao-menu-mobile{ display:none; }
   @media (max-width: 800px){
-    #layout-app{ flex-direction:column; }
-    #barra-lateral{ width:100%; flex-direction:row; align-items:center; overflow-x:auto; padding:10px 12px; gap:6px; }
+    #barra-lateral{ padding:10px 12px; gap:10px; }
     #barra-lateral .logo-app{ display:none; }
-    .nav-rodape{ margin-top:0; }
+    #itens-navegacao{ overflow-x:auto; flex-wrap:nowrap; }
     .quem-esta-logado{ display:none; }
     #conteudo-principal{ padding:16px; }
   }
@@ -207,3 +209,6 @@ input[type="file"]{ font-size:12.5px; max-width:220px; }
 .rodape-versao{ font-size:11px; color: var(--cor-tinta-suave); opacity:.75; margin-top:14px; }
 .rodape-versao a{ color: inherit; text-decoration: underline; }
 #rodape-versao-login{ text-align:center; }
+
+/* --- Configurações: seletor de cor --- */
+input[type="color"]{ cursor:pointer; }

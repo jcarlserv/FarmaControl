@@ -15,6 +15,7 @@ $('#form-login').addEventListener('submit', async () => {
   estado.unidades = await carregarUnidades();
   estado.municipios = await carregarMunicipios();
   estado.organizacao = await carregarOrganizacao();
+  aplicarCorDeMarca();
   $('#tela-login').style.display='none'; $('#app').style.display='block';
   $('#quem-esta-logado').innerHTML = `Logado como<br><strong>${escaparHtml(estado.perfil.nome)}</strong> · ${escaparHtml(estado.perfil.papel)}`
     + (estado.perfil.municipio_id ? `<br>${escaparHtml(nomeMunicipio(estado.perfil.municipio_id))}` : '')
@@ -372,9 +373,11 @@ async function renderizarConfiguracoes(raiz){
   const papel = estado.perfil.papel;
   const ehAdmin = papel==='Admin', ehGerente = papel==='Gerente', ehCoordenador = papel==='Coordenador';
   const podeGerirAcesso = ehAdmin || ehGerente;
+  const meuMunicipio = estado.municipios.find(m=>m.id===estado.perfil.municipio_id);
+  const minhaUnidadeObj = estado.unidades.find(u=>u.id===estado.perfil.unidade_id);
 
   raiz.innerHTML = `
-    <div class="cabecalho-tela"><div><h1>Configurações</h1><p>Sua conta, identidade visual e, conforme seu perfil, cadastros de acesso.</p></div></div>
+    <div class="cabecalho-tela"><div><h1>Configurações</h1><p>Sua conta e, conforme seu perfil, identidade visual e cadastros de acesso.</p></div></div>
 
     <div class="ficha">
       <h2>Minha conta</h2>
@@ -385,53 +388,44 @@ async function renderizarConfiguracoes(raiz){
       <button class="botao botao-primario" id="botao-trocar-minha-senha">Salvar nova senha</button>
     </div>
 
-    ${(ehAdmin || ehGerente || ehCoordenador) ? `
-    <div class="ficha">
-      <h2>Identidade visual</h2>
-      <p style="color:var(--cor-tinta-suave); font-size:13.5px; margin-top:-6px;">Logomarcas exibidas conforme o escopo — cada uma só pode ser trocada por quem administra aquele nível.</p>
-
-      ${ehAdmin ? `
-      <div style="margin-bottom:20px;">
-        <h3>Organização</h3>
-        <div class="campo" style="max-width:320px;"><label>Nome da organização</label><input type="text" id="org-nome" value="${escaparHtml(estado.organizacao?.nome||'')}"></div>
-        <button class="botao botao-fantasma" id="botao-salvar-nome-org" style="margin-bottom:12px;">Salvar nome</button>
-        ${blocoLogo('org', estado.organizacao?.logo_url)}
-      </div>` : ''}
-
-      <div style="margin-bottom:20px;">
-        <h3>Município</h3>
-        ${ehAdmin ? `<div class="campo" style="max-width:320px;"><label>Qual município</label><select id="logo-municipio-select">${estado.municipios.map(m=>`<option value="${m.id}">${escaparHtml(m.nome)}</option>`).join('')}</select></div>` : ''}
-        <div id="area-logo-municipio">${blocoLogo('mun', ehAdmin ? (estado.municipios[0]&&estado.municipios[0].logo_url) : nomeMunicipioLogo(estado.perfil.municipio_id))}</div>
-      </div>
-
-      ${(ehAdmin || ehGerente) ? `
-      <div style="margin-bottom:20px;">
-        <h3>Unidade de saúde</h3>
-        <div class="campo" style="max-width:320px;"><label>Qual unidade</label><select id="logo-unidade-select">${estado.unidades.map(u=>`<option value="${u.id}">${escaparHtml(u.nome)}</option>`).join('')}</select></div>
-        <div id="area-logo-unidade">${blocoLogo('uni', estado.unidades[0]&&estado.unidades[0].logo_url)}</div>
-      </div>` : (ehCoordenador ? `
-      <div style="margin-bottom:20px;">
-        <h3>Unidade de saúde</h3>
-        ${blocoLogo('uni', nomeUnidadeLogo(estado.perfil.unidade_id))}
-      </div>` : '')}
-    </div>` : ''}
-
     ${ehAdmin ? `
     <div class="ficha">
+      <h2>Organização</h2>
+      <div class="campo" style="max-width:320px;"><label>Nome da organização</label><input type="text" id="org-nome" value="${escaparHtml(estado.organizacao?.nome||'')}"></div>
+      <button class="botao botao-fantasma" id="botao-salvar-nome-org">Salvar nome</button>
+      <h3 style="margin-top:18px;">Logomarca</h3>
+      ${blocoLogo('org', estado.organizacao?.logo_url)}
+      <h3 style="margin-top:18px;">Cor de destaque padrão</h3>
+      <p style="color:var(--cor-tinta-suave); font-size:13px; margin:2px 0 0;">Usada em todo o sistema, exceto onde um município tiver a própria cor.</p>
+      ${blocoCor('org', estado.organizacao?.cor_acento)}
+    </div>` : ''}
+
+    ${(ehAdmin || ehGerente) ? `
+    <div class="ficha">
       <h2>Municípios</h2>
-      <div class="tabela-scroll"><div id="tabela-municipios">Carregando…</div></div>
-      <div style="display:flex; gap:8px; margin-top:12px; max-width:420px; flex-wrap:wrap;">
-        <input type="text" id="novo-municipio-nome" placeholder="Nome do município" style="flex:2; min-width:160px; padding:8px 10px; border:1px solid var(--cor-borda); border-radius:8px;">
-        <input type="text" id="novo-municipio-uf" placeholder="UF" maxlength="2" style="flex:1; min-width:60px; padding:8px 10px; border:1px solid var(--cor-borda); border-radius:8px; text-transform:uppercase;">
+      ${ehAdmin ? `
+      <div id="area-cadastro-municipio" style="display:flex; gap:8px; margin-bottom:14px; max-width:520px; flex-wrap:wrap; align-items:flex-end;">
+        <div class="campo" style="margin:0; min-width:160px;"><label>Estado (UF)</label><select id="novo-municipio-uf"><option value="">Carregando…</option></select></div>
+        <div class="campo" style="margin:0; min-width:220px;"><label>Município</label><select id="novo-municipio-nome" disabled><option value="">Escolha o estado primeiro</option></select></div>
         <button class="botao botao-fantasma" id="botao-add-municipio">+ Adicionar município</button>
       </div>
+      <div class="tabela-scroll"><div id="tabela-municipios">Carregando…</div></div>
+      <h3 style="margin-top:18px;">Logomarca e cor por município</h3>
+      <div class="campo" style="max-width:320px;"><label>Qual município</label><select id="logo-municipio-select">${estado.municipios.map(m=>`<option value="${m.id}">${escaparHtml(m.nome)}</option>`).join('')}</select></div>
+      <div id="area-logo-municipio"></div>
+      <div id="area-cor-municipio"></div>` : `
+      <p style="color:var(--cor-tinta-suave); font-size:13.5px; margin-top:-6px;">${meuMunicipio ? escaparHtml(meuMunicipio.nome)+' ('+escaparHtml(meuMunicipio.uf)+')' : '—'} — cadastro de novos municípios é feito só pelo Admin.</p>
+      <h3 style="margin-top:18px;">Logomarca do seu município</h3>
+      ${blocoLogo('mun', meuMunicipio?.logo_url)}
+      <h3 style="margin-top:18px;">Cor de destaque do seu município</h3>
+      <p style="color:var(--cor-tinta-suave); font-size:13px; margin:2px 0 0;">Sobrescreve a cor da organização só para quem é desse município.</p>
+      ${blocoCor('mun', meuMunicipio?.cor_acento)}`}
     </div>` : ''}
 
     ${podeGerirAcesso ? `
     <div class="ficha">
       <h2>Unidades de saúde${ehAdmin?'':' do seu município'}</h2>
-      <div class="tabela-scroll"><div id="tabela-unidades">Carregando…</div></div>
-      <div style="display:flex; gap:8px; margin-top:12px; max-width:560px; flex-wrap:wrap;">
+      <div style="display:flex; gap:8px; margin-bottom:14px; max-width:600px; flex-wrap:wrap;">
         ${ehAdmin ? `<select id="nova-unidade-municipio" style="flex:1; min-width:160px; padding:8px 10px; border:1px solid var(--cor-borda); border-radius:8px;"></select>` : ''}
         <input type="text" id="nova-unidade-nome" placeholder="Nome da unidade" style="flex:2; min-width:160px; padding:8px 10px; border:1px solid var(--cor-borda); border-radius:8px;">
         <select id="nova-unidade-tipo" style="padding:8px 10px; border:1px solid var(--cor-borda); border-radius:8px;">
@@ -439,13 +433,23 @@ async function renderizarConfiguracoes(raiz){
         </select>
         <button class="botao botao-fantasma" id="botao-add-unidade">+ Adicionar unidade</button>
       </div>
+      <div class="tabela-scroll"><div id="tabela-unidades">Carregando…</div></div>
+      <h3 style="margin-top:18px;">Logomarca por unidade</h3>
+      <div class="campo" style="max-width:320px;"><label>Qual unidade</label><select id="logo-unidade-select">${estado.unidades.map(u=>`<option value="${u.id}">${escaparHtml(u.nome)}</option>`).join('')}</select></div>
+      <div id="area-logo-unidade"></div>
     </div>
 
     <div class="ficha">
       <h2>Usuários${ehAdmin?'':' do seu município'}</h2>
       <div class="tabela-scroll"><div id="tabela-usuarios">Carregando…</div></div>
       <button class="botao botao-primario" id="botao-novo-usuario" style="margin-top:12px;">+ Novo usuário</button>
-    </div>` : ''}`;
+    </div>` : (ehCoordenador ? `
+    <div class="ficha">
+      <h2>Unidade de saúde</h2>
+      <p style="color:var(--cor-tinta-suave); font-size:13.5px; margin-top:-6px;">${minhaUnidadeObj ? escaparHtml(minhaUnidadeObj.nome) : '—'}</p>
+      <h3 style="margin-top:18px;">Logomarca da sua unidade</h3>
+      ${blocoLogo('uni', minhaUnidadeObj?.logo_url)}
+    </div>` : '')}`;
 
   // --- Minha conta ---
   $('#botao-trocar-minha-senha').addEventListener('click', async ()=>{
@@ -461,9 +465,10 @@ async function renderizarConfiguracoes(raiz){
     erroEl.style.color='var(--cor-entrada)'; erroEl.textContent='Senha atualizada.';
   });
 
-  // --- Identidade visual ---
+  // --- Organização (Admin) ---
   if(ehAdmin){
     ligarBlocoLogo('org', async (arquivo)=>uploadLogo('organizacao', null, arquivo));
+    ligarBlocoCor('org', async (cor)=>atualizarCorOrganizacao(cor), (cor)=>{ estado.organizacao.cor_acento = cor; });
     $('#botao-salvar-nome-org').addEventListener('click', async ()=>{
       const botao=$('#botao-salvar-nome-org'); botao.disabled=true;
       const resp = await atualizarNomeOrganizacao($('#org-nome').value.trim());
@@ -471,40 +476,35 @@ async function renderizarConfiguracoes(raiz){
       if(!resp.ok) alert(resp.erro); else { estado.organizacao.nome = $('#org-nome').value.trim(); }
     });
   }
-  if(ehAdmin || ehGerente){
-    if(ehAdmin){
-      const trocarBlocoMunicipio = ()=>{
-        const id=$('#logo-municipio-select').value; const m=estado.municipios.find(m=>m.id===id);
-        $('#area-logo-municipio').innerHTML = blocoLogo('mun', m&&m.logo_url);
-        ligarBlocoLogo('mun', async (arquivo)=>uploadLogo('municipio', id, arquivo), (url)=>{ if(m) m.logo_url=url; });
-      };
-      $('#logo-municipio-select').addEventListener('change', trocarBlocoMunicipio);
-      trocarBlocoMunicipio();
-    } else {
-      ligarBlocoLogo('mun', async (arquivo)=>uploadLogo('municipio', estado.perfil.municipio_id, arquivo), (url)=>{ const m=estado.municipios.find(m=>m.id===estado.perfil.municipio_id); if(m) m.logo_url=url; });
-    }
-    const trocarBlocoUnidade = ()=>{
-      const id=$('#logo-unidade-select').value; const u=estado.unidades.find(u=>u.id===id);
-      $('#area-logo-unidade').innerHTML = blocoLogo('uni', u&&u.logo_url);
-      ligarBlocoLogo('uni', async (arquivo)=>uploadLogo('unidade', id, arquivo), (url)=>{ if(u) u.logo_url=url; });
-    };
-    $('#logo-unidade-select').addEventListener('change', trocarBlocoUnidade);
-    trocarBlocoUnidade();
-  } else if(ehCoordenador){
-    ligarBlocoLogo('uni', async (arquivo)=>uploadLogo('unidade', estado.perfil.unidade_id, arquivo), (url)=>{ const u=estado.unidades.find(u=>u.id===estado.perfil.unidade_id); if(u) u.logo_url=url; });
-  }
 
-  // --- Municípios / Unidades / Usuários ---
+  // --- Municípios (cadastro Admin via IBGE, logo/cor Admin ou Gerente) ---
   if(ehAdmin){
-    $('#botao-add-municipio').addEventListener('click', async ()=>{
-      const nome=$('#novo-municipio-nome').value.trim(), uf=$('#novo-municipio-uf').value.trim().toUpperCase();
-      if(!nome || !uf) return alert('Preencha nome e UF.');
+    desenharMunicipios();
+    const trocarBlocoMunicipioSelecionado = ()=>{
+      const id=$('#logo-municipio-select').value; const m=estado.municipios.find(m=>m.id===id);
+      $('#area-logo-municipio').innerHTML = '<h4 style="margin:10px 0 4px; font-weight:600; font-size:13px;">Logomarca</h4>' + blocoLogo('mun', m&&m.logo_url);
+      ligarBlocoLogo('mun', async (arquivo)=>uploadLogo('municipio', id, arquivo), (url)=>{ if(m) m.logo_url=url; });
+      $('#area-cor-municipio').innerHTML = '<h4 style="margin:14px 0 4px; font-weight:600; font-size:13px;">Cor de destaque</h4>' + blocoCor('mun', m&&m.cor_acento);
+      ligarBlocoCor('mun', async (cor)=>atualizarCorMunicipio(id, cor), (cor)=>{ if(m) m.cor_acento=cor; });
+    };
+    $('#logo-municipio-select').addEventListener('change', trocarBlocoMunicipioSelecionado);
+    trocarBlocoMunicipioSelecionado();
+    inicializarCadastroMunicipioIBGE(async (nome, uf)=>{
       const resp = await criarMunicipio(nome, uf);
       if(!resp.ok){ alert(resp.erro); return; }
-      estado.municipios.push(resp.registro); $('#novo-municipio-nome').value=''; $('#novo-municipio-uf').value='';
+      estado.municipios.push(resp.registro);
       desenharMunicipios(); preencherSelectMunicipiosUnidade();
+      const selLogo=$('#logo-municipio-select'); if(selLogo) selLogo.innerHTML = estado.municipios.map(m=>`<option value="${m.id}">${escaparHtml(m.nome)}</option>`).join('');
+      trocarBlocoMunicipioSelecionado();
     });
+  } else if(ehGerente){
+    ligarBlocoLogo('mun', async (arquivo)=>uploadLogo('municipio', estado.perfil.municipio_id, arquivo), (url)=>{ if(meuMunicipio) meuMunicipio.logo_url=url; });
+    ligarBlocoCor('mun', async (cor)=>atualizarCorMunicipio(estado.perfil.municipio_id, cor), (cor)=>{ if(meuMunicipio) meuMunicipio.cor_acento=cor; });
+  } else if(ehCoordenador){
+    ligarBlocoLogo('uni', async (arquivo)=>uploadLogo('unidade', estado.perfil.unidade_id, arquivo), (url)=>{ if(minhaUnidadeObj) minhaUnidadeObj.logo_url=url; });
   }
+
+  // --- Unidades de saúde + Usuários (Admin/Gerente) ---
   if(podeGerirAcesso){
     $('#botao-add-unidade').addEventListener('click', async ()=>{
       const municipioId = ehAdmin ? $('#nova-unidade-municipio').value : estado.perfil.municipio_id;
@@ -515,12 +515,61 @@ async function renderizarConfiguracoes(raiz){
       if(!resp.ok){ alert(resp.erro); return; }
       estado.unidades.push(resp.registro); $('#nova-unidade-nome').value='';
       desenharUnidades();
+      const selLogo=$('#logo-unidade-select'); if(selLogo) selLogo.innerHTML = estado.unidades.map(u=>`<option value="${u.id}">${escaparHtml(u.nome)}</option>`).join('');
     });
     $('#botao-novo-usuario').addEventListener('click', abrirModalNovoUsuario);
-    if(ehAdmin){ desenharMunicipios(); preencherSelectMunicipiosUnidade(); }
+    if(ehAdmin) preencherSelectMunicipiosUnidade();
     desenharUnidades();
+    const trocarBlocoUnidade = ()=>{
+      const id=$('#logo-unidade-select').value; const u=estado.unidades.find(u=>u.id===id);
+      $('#area-logo-unidade').innerHTML = blocoLogo('uni', u&&u.logo_url);
+      ligarBlocoLogo('uni', async (arquivo)=>uploadLogo('unidade', id, arquivo), (url)=>{ if(u) u.logo_url=url; });
+    };
+    $('#logo-unidade-select').addEventListener('change', trocarBlocoUnidade);
+    trocarBlocoUnidade();
     await carregarEDesenharUsuarios();
   }
+}
+
+/** Preenche Estado→Município do cadastro de município com dados oficiais do IBGE (evita erro de digitação).
+    `aoAdicionar(nome, uf)` é chamado quando o usuário confirma o cadastro, em qualquer um dos dois caminhos. */
+async function inicializarCadastroMunicipioIBGE(aoAdicionar){
+  const selUf = $('#novo-municipio-uf'), selNome = $('#novo-municipio-nome');
+  if(!selUf) return;
+  const estados = await carregarEstadosIBGE();
+  if(!estados){
+    // Sem internet/IBGE fora do ar: cai para digitação manual, sem travar o cadastro.
+    $('#area-cadastro-municipio').innerHTML = `
+      <div class="campo" style="margin:0; min-width:160px;"><label>Nome do município</label><input type="text" id="novo-municipio-nome-manual" placeholder="Nome do município"></div>
+      <div class="campo" style="margin:0; min-width:70px;"><label>UF</label><input type="text" id="novo-municipio-uf-manual" maxlength="2" style="text-transform:uppercase;"></div>
+      <button class="botao botao-fantasma" id="botao-add-municipio">+ Adicionar município</button>
+      <p style="color:var(--cor-saida); font-size:12.5px; width:100%; margin:4px 0 0;">Não consegui carregar a lista oficial do IBGE agora — digite manualmente.</p>`;
+    $('#botao-add-municipio').addEventListener('click', async ()=>{
+      const nome=$('#novo-municipio-nome-manual').value.trim(), uf=$('#novo-municipio-uf-manual').value.trim().toUpperCase();
+      if(!nome||!uf) return alert('Preencha nome e UF.');
+      const botao=$('#botao-add-municipio'); botao.disabled=true;
+      await aoAdicionar(nome, uf);
+      botao.disabled=false;
+    });
+    return;
+  }
+  selUf.innerHTML = '<option value="">Escolha o estado</option>' + estados.map(e=>`<option value="${e.sigla}">${escaparHtml(e.nome)} (${e.sigla})</option>`).join('');
+  selUf.addEventListener('change', async ()=>{
+    const uf = selUf.value;
+    if(!uf){ selNome.disabled=true; selNome.innerHTML='<option value="">Escolha o estado primeiro</option>'; return; }
+    selNome.disabled=true; selNome.innerHTML='<option value="">Carregando municípios…</option>';
+    const municipios = await carregarMunicipiosIBGE(uf);
+    if(!municipios){ selNome.innerHTML='<option value="">Não consegui carregar — tente de novo</option>'; return; }
+    selNome.disabled=false;
+    selNome.innerHTML = '<option value="">Escolha o município</option>' + municipios.map(nome=>`<option value="${escaparHtml(nome)}">${escaparHtml(nome)}</option>`).join('');
+  });
+  $('#botao-add-municipio').addEventListener('click', async ()=>{
+    const uf = selUf.value, nome = selNome.value;
+    if(!uf || !nome) return alert('Escolha o estado e o município.');
+    const botao=$('#botao-add-municipio'); botao.disabled=true;
+    await aoAdicionar(nome, uf);
+    botao.disabled=false;
+  });
 }
 
 function nomeMunicipioLogo(id){ const m=estado.municipios.find(m=>m.id===id); return m&&m.logo_url; }
@@ -556,6 +605,30 @@ function ligarBlocoLogo(prefixo, funcaoUpload, aoSalvar){
     if(img){ img.src = resp.url; img.style.display=''; }
     if(semLogo) semLogo.style.display='none';
     if(aoSalvar) aoSalvar(resp.url);
+  });
+}
+
+function blocoCor(prefixo, corAtual){
+  return `
+    <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+      <input type="color" id="cor-${prefixo}" value="${corAtual || '#E2992F'}" style="width:44px; height:34px; border:1px solid var(--cor-borda); border-radius:6px; padding:2px; background:#fff;">
+      <button class="botao botao-fantasma" id="botao-cor-${prefixo}">Salvar cor</button>
+      <span class="erro-form" id="erro-cor-${prefixo}"></span>
+    </div>`;
+}
+function ligarBlocoCor(prefixo, funcaoSalvar, aoSalvar){
+  const botao = document.getElementById('botao-cor-'+prefixo);
+  if(!botao) return;
+  botao.addEventListener('click', async ()=>{
+    const input = document.getElementById('cor-'+prefixo);
+    const erroEl = document.getElementById('erro-cor-'+prefixo);
+    erroEl.textContent='';
+    botao.disabled=true; botao.textContent='Salvando…';
+    const resp = await funcaoSalvar(input.value);
+    botao.disabled=false; botao.textContent='Salvar cor';
+    if(!resp.ok){ erroEl.textContent=resp.erro; return; }
+    if(aoSalvar) aoSalvar(input.value);
+    aplicarCorDeMarca();
   });
 }
 

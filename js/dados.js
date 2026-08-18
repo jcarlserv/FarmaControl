@@ -176,8 +176,8 @@ async function carregarOrganizacao(){
   progOn();
   try{
     if(MODO_DEMO){ await atraso(); return { ...demo.organizacao }; }
-    const { data, error } = await sb.from('organizacao').select('nome,logo_url').eq('id', true).single();
-    if(error) return { nome:'Organização', logo_url:null };
+    const { data, error } = await sb.from('organizacao').select('nome,logo_url,cor_acento').eq('id', true).single();
+    if(error) return { nome:'Organização', logo_url:null, cor_acento:null };
     return data;
   } finally { progOff(); }
 }
@@ -189,6 +189,55 @@ async function atualizarNomeOrganizacao(nome){
     if(error) return { ok:false, erro:error.message };
     return { ok:true };
   } finally { progOff(); }
+}
+async function atualizarCorOrganizacao(corHex){
+  progOn();
+  try{
+    if(MODO_DEMO){ await atraso(); demo.organizacao.cor_acento = corHex; return { ok:true }; }
+    const { error } = await sb.from('organizacao').update({ cor_acento: corHex }).eq('id', true);
+    if(error) return { ok:false, erro:error.message };
+    return { ok:true };
+  } finally { progOff(); }
+}
+async function atualizarCorMunicipio(municipioId, corHex){
+  progOn();
+  try{
+    if(MODO_DEMO){ await atraso(); const m=demo.municipios.find(m=>m.id===municipioId); if(m) m.cor_acento=corHex; return { ok:true }; }
+    const { error } = await sb.from('municipios').update({ cor_acento: corHex }).eq('id', municipioId);
+    if(error) return { ok:false, erro:error.message };
+    return { ok:true };
+  } finally { progOff(); }
+}
+
+/** Aplica a cor de destaque do painel: cor do município do usuário (se tiver) > cor da organização > padrão do CSS. */
+function aplicarCorDeMarca(){
+  const municipioDoUsuario = estado.municipios.find(m=>m.id===estado.perfil.municipio_id);
+  const cor = (municipioDoUsuario && municipioDoUsuario.cor_acento) || (estado.organizacao && estado.organizacao.cor_acento) || null;
+  if(cor) document.documentElement.style.setProperty('--cor-acento', cor);
+}
+
+/* ============================================================================
+   IBGE — estados e municípios oficiais (evita erro de digitação no cadastro)
+   ============================================================================ */
+async function carregarEstadosIBGE(){
+  try{
+    const resp = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome');
+    if(!resp.ok) throw new Error('Falha ao consultar o IBGE.');
+    const dados = await resp.json();
+    return dados.map(uf => ({ sigla: uf.sigla, nome: uf.nome }));
+  } catch(erro){
+    return null; // o chamador cai para um campo de texto normal se isso vier nulo
+  }
+}
+async function carregarMunicipiosIBGE(uf){
+  try{
+    const resp = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`);
+    if(!resp.ok) throw new Error('Falha ao consultar o IBGE.');
+    const dados = await resp.json();
+    return dados.map(m => m.nome);
+  } catch(erro){
+    return null;
+  }
 }
 
 // escopo: 'organizacao' | 'municipio' | 'unidade'. alvoId: null para organização.
