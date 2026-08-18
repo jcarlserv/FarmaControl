@@ -10,7 +10,7 @@ const sb = MODO_DEMO ? null : supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.
 // lateral) é preenchido sozinho a partir daqui.
 const SISTEMA = {
   nome: 'FarmaControl',
-  versao: '1.2.0',
+  versao: '1.3.0',
   desenvolvidoPor: 'DSP Group',
   instagramHandle: '@dspgrupointegra',
   instagramUrl: 'https://www.instagram.com/dspgrupointegra/'

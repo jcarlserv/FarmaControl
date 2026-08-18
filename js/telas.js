@@ -10,7 +10,7 @@ async function entrarNoApp(perfil, token){
   estado.municipios = await carregarMunicipios();
   estado.organizacao = await carregarOrganizacao();
   aplicarCorDeMarca();
-  $('#tela-login').style.display='none'; $('#app').style.display='block';
+  $('#tela-login').style.display='none'; $('#app').style.display='flex';
   $('#quem-esta-logado').innerHTML = `Logado como<br><strong>${escaparHtml(estado.perfil.nome)}</strong> · ${escaparHtml(estado.perfil.papel)}`
     + (estado.perfil.municipio_id ? `<br>${escaparHtml(nomeMunicipio(estado.perfil.municipio_id))}` : '')
     + (estado.perfil.unidade_id ? `<br>${escaparHtml(nomeUnidade(estado.perfil.unidade_id))}` : '');
@@ -212,11 +212,16 @@ async function salvarNovoUsuario(){
   const unidadeId = $('#nu-unidade') && $('#campo-nu-unidade').style.display!=='none' ? $('#nu-unidade').value : null;
   if(!nome||!email||!senha) { $('#erro-modal').textContent = 'Preencha nome, e-mail e senha.'; return; }
   const botao=$('#botao-salvar-modal'); botao.disabled=true; botao.textContent='Criando…';
-  const resp = await criarUsuario({ nome, email, senha, papel, municipioId, unidadeId });
-  botao.disabled=false; botao.textContent='Salvar';
-  if(!resp.ok){ $('#erro-modal').textContent = resp.erro; return; }
-  $('#sobreposicao-modal').style.display='none';
-  await carregarEDesenharUsuarios();
+  try{
+    const resp = await criarUsuario({ nome, email, senha, papel, municipioId, unidadeId });
+    if(!resp.ok){ $('#erro-modal').textContent = resp.erro; return; }
+    $('#sobreposicao-modal').style.display='none';
+    await carregarEDesenharUsuarios();
+  } catch(erro){
+    $('#erro-modal').textContent = 'Erro inesperado: ' + erro.message;
+  } finally {
+    botao.disabled=false; botao.textContent='Salvar';
+  }
 }
 
 async function salvarRedefinicaoSenha(){
@@ -224,10 +229,15 @@ async function salvarRedefinicaoSenha(){
   if(s1.length<6){ $('#erro-modal').textContent='A senha precisa ter pelo menos 6 caracteres.'; return; }
   if(s1!==s2){ $('#erro-modal').textContent='As senhas não coincidem.'; return; }
   const botao=$('#botao-salvar-modal'); botao.disabled=true; botao.textContent='Salvando…';
-  const resp = await redefinirSenhaUsuario(estado._redefinirSenhaId, s1);
-  botao.disabled=false; botao.textContent='Salvar';
-  if(!resp.ok){ $('#erro-modal').textContent = resp.erro; return; }
-  $('#sobreposicao-modal').style.display='none';
+  try{
+    const resp = await redefinirSenhaUsuario(estado._redefinirSenhaId, s1);
+    if(!resp.ok){ $('#erro-modal').textContent = resp.erro; return; }
+    $('#sobreposicao-modal').style.display='none';
+  } catch(erro){
+    $('#erro-modal').textContent = 'Erro inesperado: ' + erro.message;
+  } finally {
+    botao.disabled=false; botao.textContent='Salvar';
+  }
 }
 
 /* ============================================================================
@@ -657,9 +667,20 @@ function ligarBlocoCor(prefixo, funcaoSalvar, aoSalvar){
 function desenharMunicipios(){
   const alvo=$('#tabela-municipios'); if(!alvo) return;
   if(estado.municipios.length===0){ alvo.innerHTML='<div class="vazio">Nenhum município cadastrado ainda.</div>'; return; }
-  alvo.innerHTML = `<table><thead><tr><th>Município</th><th>UF</th></tr></thead><tbody>
-    ${estado.municipios.map(m=>`<tr><td>${escaparHtml(m.nome)}</td><td>${escaparHtml(m.uf)}</td></tr>`).join('')}
+  alvo.innerHTML = `<table><thead><tr><th>Município</th><th>UF</th><th></th></tr></thead><tbody>
+    ${estado.municipios.map(m=>`<tr><td>${escaparHtml(m.nome)}</td><td>${escaparHtml(m.uf)}</td>
+      <td class="acoes-linha"><button data-excluir-municipio="${escaparHtml(m.id)}" data-nome="${escaparHtml(m.nome)}">Excluir</button></td></tr>`).join('')}
   </tbody></table>`;
+  $all('button[data-excluir-municipio]', alvo).forEach(b=>b.addEventListener('click', async ()=>{
+    if(!confirm('Excluir o município "'+b.dataset.nome+'"? Só funciona se não houver unidades de saúde nele.')) return;
+    b.disabled=true;
+    const resp = await excluirMunicipio(b.dataset.excluirMunicipio);
+    b.disabled=false;
+    if(!resp.ok){ alert(resp.erro); return; }
+    estado.municipios = estado.municipios.filter(m=>m.id!==b.dataset.excluirMunicipio);
+    desenharMunicipios(); preencherSelectMunicipiosUnidade();
+    const selLogo=$('#logo-municipio-select'); if(selLogo) selLogo.innerHTML = estado.municipios.map(m=>`<option value="${m.id}">${escaparHtml(m.nome)}</option>`).join('');
+  }));
 }
 function preencherSelectMunicipiosUnidade(){
   const sel=$('#nova-unidade-municipio'); if(!sel) return;

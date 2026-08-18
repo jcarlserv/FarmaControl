@@ -108,13 +108,37 @@ async function removerOpcaoLista(lista, valor){
   } finally { progOff(); }
 }
 
+function traduzErroMunicipio(error){
+  if(error.code === '23505') return 'Esse município já está cadastrado (mesmo nome e UF).';
+  if(error.code === '23503') return 'Não é possível excluir: existem unidades de saúde ou movimentações vinculadas a este município. Exclua ou transfira essas unidades primeiro.';
+  return error.message;
+}
 async function criarMunicipio(nome, uf){
   progOn();
   try{
-    if(MODO_DEMO){ await atraso(); const novo={ id:'mun'+Date.now(), nome, uf }; demo.municipios.push(novo); return {ok:true, registro:novo}; }
+    if(MODO_DEMO){
+      await atraso();
+      if(demo.municipios.some(m => m.nome.toLowerCase()===nome.toLowerCase() && m.uf===uf)) return { ok:false, erro:'Esse município já está cadastrado (mesmo nome e UF).' };
+      const novo={ id:'mun'+Date.now(), nome, uf, logo_url:null, cor_acento:null }; demo.municipios.push(novo); return {ok:true, registro:novo};
+    }
     const { data, error } = await sb.from('municipios').insert({ nome, uf }).select().single();
-    if(error) return { ok:false, erro: error.message };
+    if(error) return { ok:false, erro: traduzErroMunicipio(error) };
     return { ok:true, registro:data };
+  } finally { progOff(); }
+}
+async function excluirMunicipio(id){
+  progOn();
+  try{
+    if(MODO_DEMO){
+      await atraso();
+      const temUnidade = demo.unidades.some(u => u.municipio_id === id);
+      if(temUnidade) return { ok:false, erro:'Não é possível excluir: existem unidades de saúde vinculadas a este município.' };
+      demo.municipios = demo.municipios.filter(m => m.id !== id);
+      return { ok:true };
+    }
+    const { error } = await sb.from('municipios').delete().eq('id', id);
+    if(error) return { ok:false, erro: traduzErroMunicipio(error) };
+    return { ok:true };
   } finally { progOff(); }
 }
 async function criarUnidade(municipio_id, nome, tipo){
@@ -151,12 +175,16 @@ async function criarUsuario(dados){
       demo.perfis[dados.email] = { senha:dados.senha, nome:dados.nome, papel:dados.papel, municipio_id: dados.papel==='Admin'?null:dados.municipioId, unidade_id: (dados.papel==='Coordenador'||dados.papel==='Colaborador')?dados.unidadeId:null };
       return { ok:true };
     }
-    const resp = await fetch('/api/criar-usuario', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+estado.token },
-      body: JSON.stringify({ nome:dados.nome, email:dados.email, senha:dados.senha, papel:dados.papel, municipioId:dados.municipioId, unidadeId:dados.unidadeId })
-    });
-    return await resp.json();
+    try{
+      const resp = await fetch('/api/criar-usuario', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+estado.token },
+        body: JSON.stringify({ nome:dados.nome, email:dados.email, senha:dados.senha, papel:dados.papel, municipioId:dados.municipioId, unidadeId:dados.unidadeId })
+      });
+      return await resp.json();
+    } catch(erro){
+      return { ok:false, erro:'Não consegui falar com o servidor de criação de usuários. Isso só funciona quando o site está publicado no Vercel (não funciona no GitHub Pages). Detalhe técnico: ' + erro.message };
+    }
   } finally { progOff(); }
 }
 
@@ -287,12 +315,16 @@ async function redefinirSenhaUsuario(usuarioId, novaSenha){
       p.senha = novaSenha;
       return { ok:true };
     }
-    const resp = await fetch('/api/redefinir-senha', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+estado.token },
-      body: JSON.stringify({ usuarioIdAlvo: usuarioId, novaSenha })
-    });
-    return await resp.json();
+    try{
+      const resp = await fetch('/api/redefinir-senha', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+estado.token },
+        body: JSON.stringify({ usuarioIdAlvo: usuarioId, novaSenha })
+      });
+      return await resp.json();
+    } catch(erro){
+      return { ok:false, erro:'Não consegui falar com o servidor. Isso só funciona quando o site está publicado no Vercel (não funciona no GitHub Pages). Detalhe técnico: ' + erro.message };
+    }
   } finally { progOff(); }
 }
 

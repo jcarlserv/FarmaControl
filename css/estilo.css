@@ -96,13 +96,13 @@
   .ajuda-demo{ margin-top:18px; font-size:12.5px; color: var(--cor-tinta-suave); border-top:1px dashed var(--cor-borda); padding-top:14px; }
 
   /* --- Layout principal --- */
-  #app{ display:none; min-height:100vh; }
+  #app{ display:none; flex-direction:column; min-height:100vh; }
   #barra-lateral{
     width:100%; background: var(--cor-tinta); color:#EAF2EF; flex-shrink:0;
     padding:10px 20px; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
   }
   #barra-lateral .logo-app{ color:#fff; margin:0; }
-  #itens-navegacao{ display:flex; align-items:center; flex-wrap:wrap; gap:3px; flex:1; min-width:200px; }
+  #itens-navegacao{ display:flex; align-items:center; flex-wrap:nowrap; overflow-x:auto; gap:2px; flex:1; min-width:0; scrollbar-width:thin; }
   .nav-item{
     display:flex; align-items:center; gap:7px; padding:8px 12px; border-radius:8px;
     color:#C9DAD4; font-size:13.5px; font-weight:500; text-decoration:none; white-space:nowrap;
@@ -112,9 +112,15 @@
   .nav-item.ativo{ background: var(--cor-acento); color:#3A2600; font-weight:600; }
   .nav-separador{ display:none; }
   .nav-rodape{ margin:0; display:flex; align-items:center; gap:12px; flex-shrink:0; }
-  .quem-esta-logado{ font-size:12px; color:#9CB6AF; line-height:1.35; text-align:right; }
+  .quem-esta-logado{ font-size:12px; color:#9CB6AF; line-height:1.35; text-align:right; white-space:nowrap; }
   .quem-esta-logado br{ display:none; }
   .quem-esta-logado br:first-of-type{ display:block; }
+
+  .rodape-app{
+    flex-shrink:0; text-align:center; padding:16px 20px 22px; font-size:11px;
+    color: var(--cor-tinta-suave); opacity:.75;
+  }
+  .rodape-app a{ color: inherit; text-decoration: underline; }
 
   #conteudo-principal{ flex:1; min-width:0; padding: 22px 26px 60px; }
   .cabecalho-tela{ display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
@@ -192,14 +198,18 @@
   .vazio{ text-align:center; color: var(--cor-tinta-suave); padding:30px 10px; font-size:13.5px; }
   .rodape-nota{ color: var(--cor-tinta-suave); font-size:12px; margin-top:26px; }
 
-  #layout-app{ display:flex; flex-direction:column; min-height:100vh; }
+  #layout-app{ display:flex; flex-direction:column; flex:1; }
   #botao-menu-mobile{ display:none; }
   @media (max-width: 800px){
     #barra-lateral{ padding:10px 12px; gap:10px; }
     #barra-lateral .logo-app{ display:none; }
-    #itens-navegacao{ overflow-x:auto; flex-wrap:nowrap; }
+    .nav-item{ padding:7px 10px; font-size:12.5px; }
     .quem-esta-logado{ display:none; }
     #conteudo-principal{ padding:16px; }
+  }
+  @media (max-width: 480px){
+    #barra-lateral{ gap:8px; }
+    .rodape-app{ padding:14px 14px 18px; font-size:10.5px; }
   }
 
 /* --- Configurações: upload de logomarca --- */
