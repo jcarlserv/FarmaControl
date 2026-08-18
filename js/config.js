@@ -3,14 +3,14 @@
    ============================================================================ */
 const CONFIG = { SUPABASE_URL: 'https://tvcvanvnjbfzmsspiyxb.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_HAiRkJ5AuWNosaTMiOiHbg_rIrk85-u' };
 const MODO_DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
-const sb = MODO_DEMO ? null : supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, { auth:{ persistSession:false } });
+const sb = MODO_DEMO ? null : supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true } });
 
 // Só mude a "versao" aqui quando publicar uma atualização — é o único lugar do
 // sistema que precisa ser editado pra isso. O rodapé (tela de login e barra
 // lateral) é preenchido sozinho a partir daqui.
 const SISTEMA = {
   nome: 'FarmaControl',
-  versao: '1.1.0',
+  versao: '1.2.0',
   desenvolvidoPor: 'DSP Group',
   instagramHandle: '@dspgrupointegra',
   instagramUrl: 'https://www.instagram.com/dspgrupointegra/'

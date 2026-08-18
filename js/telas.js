@@ -3,14 +3,8 @@
    ============================================================================ */
 if(MODO_DEMO){ $('#faixa-demo').style.display='block'; $('#ajuda-demo').style.display='block'; }
 
-$('#form-login').addEventListener('submit', async () => {
-  const email=$('#campo-usuario').value.trim(), senha=$('#campo-senha').value;
-  const botao=$('#botao-entrar'), erroEl=$('#erro-login');
-  erroEl.textContent=''; botao.disabled=true; botao.textContent='Entrando…';
-  const resp = await login(email, senha);
-  botao.disabled=false; botao.textContent='Entrar';
-  if(!resp.ok){ erroEl.textContent = resp.erro; return; }
-  estado.perfil = resp.perfil; estado.token = resp.token || null;
+async function entrarNoApp(perfil, token){
+  estado.perfil = perfil; estado.token = token || null;
   estado.listas = await carregarListas();
   estado.unidades = await carregarUnidades();
   estado.municipios = await carregarMunicipios();
@@ -21,7 +15,35 @@ $('#form-login').addEventListener('submit', async () => {
     + (estado.perfil.municipio_id ? `<br>${escaparHtml(nomeMunicipio(estado.perfil.municipio_id))}` : '')
     + (estado.perfil.unidade_id ? `<br>${escaparHtml(nomeUnidade(estado.perfil.unidade_id))}` : '');
   montarNavegacao(); abrirTela('movimentacao');
+}
+
+$('#form-login').addEventListener('submit', async () => {
+  const email=$('#campo-usuario').value.trim(), senha=$('#campo-senha').value;
+  const botao=$('#botao-entrar'), erroEl=$('#erro-login');
+  erroEl.textContent=''; botao.disabled=true; botao.textContent='Entrando…';
+  const resp = await login(email, senha);
+  botao.disabled=false; botao.textContent='Entrar';
+  if(!resp.ok){ erroEl.textContent = resp.erro; return; }
+  await entrarNoApp(resp.perfil, resp.token);
 });
+
+/** Ao carregar a página, se já existir uma sessão do Supabase salva no navegador,
+    entra direto no painel sem pedir login de novo. */
+async function tentarRestaurarSessao(){
+  if(MODO_DEMO) return; // modo demonstração nunca guarda sessão real
+  try{
+    const { data } = await sb.auth.getSession();
+    const sessao = data && data.session;
+    if(!sessao) return;
+    const { data: perfilRow, error } = await sb.from('perfis')
+      .select('nome,papel,municipio_id,unidade_id,ativo').eq('id', sessao.user.id).single();
+    if(error || !perfilRow || !perfilRow.ativo){ await sb.auth.signOut(); return; }
+    await entrarNoApp({ id: sessao.user.id, usuario: sessao.user.email, ...perfilRow }, sessao.access_token);
+  } catch(erro){
+    // Sem conexão ou sessão inválida — sem problema, só mostra a tela de login normalmente.
+  }
+}
+tentarRestaurarSessao();
 
 function sair(){
   if(estado.dashboard.timer) clearInterval(estado.dashboard.timer);
